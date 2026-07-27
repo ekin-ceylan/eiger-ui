@@ -19,6 +19,7 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
             ...super.properties,
             autocomplete: { type: String },
             spellcheck: { type: Boolean, reflect: true },
+            showCounter: { type: Boolean, reflect: true, attribute: 'show-counter' },
             inputmode: { type: String, reflect: true },
             maxlength: { type: Number },
             minlength: { type: Number },
@@ -41,6 +42,19 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
         }
 
         return this.#cachedInput;
+    }
+
+    /**
+     * The text to be displayed in the character counter, based on the current value length and the maxlength attribute.
+     * By default, if maxlength is set, it shows the remaining characters; otherwise, it shows the current length.
+     * It can be overridden by subclasses to provide custom counter text logic.
+     * @returns {string}
+     */
+    get counterText() {
+        const valueLength = this.value?.length ?? 0;
+        const counter = this.maxlength > 0 ? this.maxlength - valueLength : valueLength;
+
+        return `${counter}`;
     }
 
     /**
@@ -68,6 +82,8 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
         this.autocomplete = undefined;
         /** @type {boolean} Whether spellcheck is enabled for the input element */
         this.spellcheck = true;
+        /** @type {boolean} Whether the character counter is shown when maxlength is set */
+        this.showCounter = false;
         /** @type {string | undefined} The inputmode attribute for the input element (e.g., 'numeric', 'decimal', 'tel'). Will be 'text' if not specified */
         this.inputmode = undefined;
         /** @type {number | undefined} The maximum length of the input value */
@@ -224,7 +240,19 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
             ${this.renderErrorMessage()}`;
     }
 
+    /**
+     * Renders the adornment element for the textarea. By default, it returns character counter, but can be overridden by subclasses to provide custom adornment rendering logic.
+     *
+     * @example
+     * renderAdornment() {
+     *     return html`<span class="adornment">%</span>`;
+     * }
+     * @protected
+     * @category rendering
+     * @return {import('lit').TemplateResult | typeof nothing}
+     */
     renderAdornment() {
-        return nothing;
+        if (!this.showCounter) return nothing;
+        return html`<span data-role="counter" aria-live="polite">${this.counterText}</span>`;
     }
 }

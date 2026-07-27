@@ -85,6 +85,73 @@ describe('Validation tests', () => {
     });
 });
 
+describe('Character counter tests', () => {
+    it('renders counter when show-counter and maxlength are set', async () => {
+        const [, host] = await initInputBase('<text-area label="Description" show-counter maxlength="5"></text-area>');
+        const counter = host.querySelector('[data-role="counter"]');
+
+        expect(counter).not.toBeNull();
+        expect(counter.textContent.trim()).toBe('5');
+    });
+
+    it('updates counter based on maxlength while typing', async () => {
+        const [input, host, user] = await initInputBase('<text-area label="Description" show-counter maxlength="5"></text-area>');
+
+        await user.type(input, 'ab');
+
+        const counter = host.querySelector('[data-role="counter"]');
+        expect(counter).not.toBeNull();
+        expect(counter.textContent.trim()).toBe('3');
+    });
+
+    it('renders counter and counts forward when maxlength is not set', async () => {
+        const [input, host, user] = await initInputBase('<text-area label="Description" show-counter></text-area>');
+
+        const initialCounter = host.querySelector('[data-role="counter"]');
+        expect(initialCounter).not.toBeNull();
+        expect(initialCounter.textContent.trim()).toBe('0');
+
+        await user.type(input, 'ab');
+
+        const counter = host.querySelector('[data-role="counter"]');
+        expect(counter).not.toBeNull();
+        expect(counter.textContent.trim()).toBe('2');
+    });
+
+    it('updates counter when value is set programmatically with maxlength', async () => {
+        const [, host] = await initInputBase('<text-area label="Description" show-counter maxlength="5"></text-area>');
+
+        host.value = 'abc';
+        await host.updateComplete;
+
+        const counter = host.querySelector('[data-role="counter"]');
+        expect(counter).not.toBeNull();
+        expect(counter.textContent.trim()).toBe('2');
+    });
+
+    it('shows negative counter when programmatic value exceeds maxlength', async () => {
+        const [, host] = await initInputBase('<text-area label="Description" show-counter maxlength="5"></text-area>');
+
+        host.value = 'abcdef';
+        await host.updateComplete;
+
+        const counter = host.querySelector('[data-role="counter"]');
+        expect(counter).not.toBeNull();
+        expect(counter.textContent.trim()).toBe('-1');
+    });
+
+    it('updates forward counter when value is set programmatically without maxlength', async () => {
+        const [, host] = await initInputBase('<text-area label="Description" show-counter></text-area>');
+
+        host.value = 'abcd';
+        await host.updateComplete;
+
+        const counter = host.querySelector('[data-role="counter"]');
+        expect(counter).not.toBeNull();
+        expect(counter.textContent.trim()).toBe('4');
+    });
+});
+
 describe('Value and slot behavior', () => {
     afterEach(() => {
         document.body.innerHTML = '';

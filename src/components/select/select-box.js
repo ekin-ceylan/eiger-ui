@@ -119,7 +119,7 @@ this.#optionList = list.filter(o => o instanceof OptionGroup || !isEmpty(o.value
     // #region INTERNAL HOOKS
 
     /** @inheritdoc */
-    validateNode(node, slotName, hiddenByCollector) {
+    validateNode(node, slotName) {
         if (slotName != 'default') return true;
 
         const hasOptions = this.#options?.length > 0;
@@ -139,7 +139,6 @@ this.#optionList = list.filter(o => o instanceof OptionGroup || !isEmpty(o.value
         }
 
         const option = isOptionElement ? new Option(node) : new OptionGroup(node);
-        option.hidden = !hiddenByCollector;
 
         if (isOptionElement && isEmpty(option.value)) {
 if (isEmpty(this.placeholder)) {

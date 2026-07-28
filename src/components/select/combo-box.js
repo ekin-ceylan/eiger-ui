@@ -133,14 +133,8 @@ export default class ComboBox extends SelectBase {
 
     // #endregion LIFECYCLE METHODS
 
-    /**
-     * @override Validates nodes for slot binding.
-     * @param {HTMLElement|Text} node
-     * @param {String} slotName
-     * @param {Boolean} hiddenByCollector
-     * @returns {Boolean}
-     */
-    validateNode(node, slotName, hiddenByCollector) {
+    /** @inheritdoc */
+    validateNode(node, slotName) {
         if (slotName != 'default') return true;
 
         const hasOptions = this.options?.length > 0;
@@ -157,9 +151,8 @@ export default class ComboBox extends SelectBase {
         }
 
         const option = this.#parseOption(node);
-        option.hidden = !hiddenByCollector;
-        this.#optionList.push(option);
-        if (option.selected) this.#onSelect(option);
+                this.#optionList.push(option);
+        if (option.selected) this.#onSelect(option, false);
 
         return false; // abort default slotting process
     }

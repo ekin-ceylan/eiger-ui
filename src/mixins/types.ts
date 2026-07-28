@@ -17,13 +17,6 @@ export interface UniqueIdGenerator {
 
 export interface SlotCollector {
     /**
-     * Attribute used to mark nodes as being collected.
-     * Default value is `'slot-collecting'`.
-     * @protected
-     */
-    readonly COLLECTING_ATTR: string;
-
-    /**
      * Binds the collected nodes to their respective slot elements.
      * @param {(HTMLElement|Text)[]} collectedNodes - Collected nodes to bind to slots.
      * @protected
@@ -46,10 +39,9 @@ export interface SlotCollector {
      * Returns true if the node is valid and should be included in the slot, false otherwise.
      * @param {HTMLElement|Text} node The node to validate.
      * @param {string} slotName The name of the slot the node is intended for.
-     * @param {boolean} hiddenByCollector Indicates if the node was hidden by the collector.
      * @protected
      */
-    validateNode(node: HTMLElement | Text, slotName: string, hiddenByCollector: boolean): boolean;
+    validateNode(node: HTMLElement | Text, slotName: string): boolean;
 }
 
 export interface PropValidator {

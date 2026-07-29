@@ -20,7 +20,7 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
             autocomplete: { type: String },
             spellcheck: { type: Boolean, reflect: true },
             showCounter: { type: Boolean, reflect: true, attribute: 'show-counter' },
-            description: { type: String, attribute: false },
+            description: { type: Object, attribute: false },
             inputmode: { type: String, reflect: true },
             maxlength: { type: Number },
             minlength: { type: Number },
@@ -89,7 +89,7 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
         this.spellcheck = true;
         /** @type {boolean} Whether the character counter is shown when maxlength is set */
         this.showCounter = false;
-        /** @type {string | HTMLElement | undefined} The description text for the textarea */
+        /** @type {string | HTMLElement | Text | undefined} The description text or HTML element for the textarea */
         this.description = undefined;
         /** @type {string | undefined} The inputmode attribute for the input element (e.g., 'numeric', 'decimal', 'tel'). Will be 'text' if not specified */
         this.inputmode = undefined;
@@ -107,7 +107,12 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
 
     // #region INTERNAL HOOKS
 
-    /** @inheritdoc */
+    /**
+     * @param {HTMLElement|Text} node
+     * @param {string} slotName
+     * @returns {boolean}
+     * @override
+     */
     validateNode(node, slotName) {
         if (slotName === 'default') {
             return this.#validateDefaultNode(node);
@@ -204,6 +209,11 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
 
     // #region PRIVATE
 
+    /**
+     * Validates the content of a default slot node and updates the internal slot content accordingly.
+     * @param {HTMLElement|Text} node The node to validate.
+     * @returns {boolean}
+     */
     #validateDefaultNode(node) {
         if (!isEmpty(this.value)) {
             console.warn('Value is already set via property. Ignoring slotted nodes.');
@@ -213,14 +223,19 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
         if (node.nodeType === Node.TEXT_NODE) {
             this.#slotContent += node.textContent ?? '';
         } else if (node.nodeType === Node.ELEMENT_NODE) {
-            this.#slotContent += node.outerHTML ?? '';
+            this.#slotContent += /** @type {HTMLElement} */ (node).outerHTML ?? '';
         }
 
         return false;
     }
 
+    /**
+     * Validates the content of a description slot node and updates the internal description accordingly.
+     * @param {HTMLElement|Text} node The node to validate.
+     * @returns {boolean}
+     */
     #validateDescriptionNode(node) {
-        this.description = node ?? '';
+        this.description = node;
         return false;
     }
 

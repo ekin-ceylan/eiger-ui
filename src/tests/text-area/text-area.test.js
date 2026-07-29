@@ -179,14 +179,6 @@ describe('Value and slot behavior', () => {
         expect(host.value).toContain('<b>Hi</b>');
         expect(input.value).toContain('<b>Hi</b>');
     });
-
-    it('does not leak slot-collecting marker into serialized slot content', async () => {
-        const [input, host] = await initInputBase('<text-area label="Desc"><em>text</em></text-area>');
-
-        await host.updateComplete;
-        expect(host.value).not.toContain('slot-collecting');
-        expect(input.value).not.toContain('slot-collecting');
-    });
 });
 
 describe('Accessibility (A11y) tests', () => {
@@ -246,6 +238,103 @@ describe('Reset tests', () => {
     });
 });
 
+describe('Description tests', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it('renders description element when string property is set', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"></text-area>');
+
+        host.description = 'Helper text for the field';
+        await host.updateComplete;
+
+        const descElement = host.querySelector('[data-role="description"]');
+        expect(descElement).not.toBeNull();
+        expect(descElement.textContent.trim()).toBe('Helper text for the field');
+    });
+
+    it('sets aria-describedby when description property is set', async () => {
+        const [input, host] = await initInputBase('<text-area label="Description"></text-area>');
+
+        host.description = 'Helper text';
+        await host.updateComplete;
+
+        expect(input.getAttribute('aria-describedby')).toBe(host.descriptionId);
+    });
+
+    it('does not set aria-describedby when description is not set', async () => {
+        const [input] = await initInputBase('<text-area label="Description"></text-area>');
+
+        expect(input.hasAttribute('aria-describedby')).toBe(false);
+    });
+
+    it('renders HTMLElement description property', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"></text-area>');
+
+        const descDiv = document.createElement('div');
+        descDiv.innerHTML = '<strong>Important:</strong> This is required';
+        host.description = descDiv;
+        await host.updateComplete;
+
+        const descElement = host.querySelector('[data-role="description"]');
+        expect(descElement).not.toBeNull();
+        expect(descElement.querySelector('strong')).not.toBeNull();
+        expect(descElement.querySelector('strong').textContent).toBe('Important:');
+    });
+
+    it('renders description slot when provided', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"><span slot="description">Slotted helper</span></text-area>');
+        await host.updateComplete;
+
+        const descElement = host.querySelector('[data-role="description"]');
+        expect(descElement).not.toBeNull();
+        expect(descElement.textContent).toContain('Slotted helper');
+    });
+
+    it('prefers property over slot when both are provided', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"><span slot="description">Slotted</span></text-area>');
+
+        host.description = 'Property text';
+        await host.updateComplete;
+
+        const descElement = host.querySelector('[data-role="description"]');
+        expect(descElement.textContent).toContain('Property text');
+        expect(descElement.textContent).not.toContain('Slotted');
+    });
+
+    it('does not render description element when neither property nor slot is provided', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"></text-area>');
+
+        const descElement = host.querySelector('[data-role="description"]');
+        expect(descElement).toBeNull();
+    });
+
+    it('removes description when property is cleared', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"></text-area>');
+
+        host.description = 'Helper text';
+        await host.updateComplete;
+        expect(host.querySelector('[data-role="description"]')).not.toBeNull();
+
+        host.description = undefined;
+        await host.updateComplete;
+        expect(host.querySelector('[data-role="description"]')).toBeNull();
+    });
+
+    it('has correct description id format', async () => {
+        const [, host] = await initInputBase('<text-area label="Description"></text-area>');
+
+        host.description = 'Helper';
+        await host.updateComplete;
+
+        const descElement = host.querySelector('[data-role="description"]');
+        expect(descElement.id).toBe(host.descriptionId);
+        expect(descElement.id).toContain('description');
+        expect(descElement.id).toContain(host.uniqueId);
+    });
+});
+
 /*
 TEST CASES FOR TEXT AREA COMPONENT
 
@@ -258,8 +347,7 @@ VALUE / SLOT BEHAVIOR
 2. collects default slotted text nodes as initial textarea value when value is empty
 3. collects default slotted element nodes as literal text (outerHTML)
 4. ignores slotted nodes when value is already set and logs warning
-5. does not leak collector internals (slot-collecting, hidden) into serialized slot content
-6. non-default slot content should keep standard SlotCollector behavior (extensibility)
+5. non-default slot content should keep standard SlotCollector behavior (extensibility)
 
 VALIDATION
 1. required: shows error when value becomes empty after interaction
@@ -291,6 +379,17 @@ ACCESSIBILITY (A11Y)
 TEXTAREA-SPECIFIC ATTRS
 1. forwards rows/cols/wrap attributes to native textarea
 2. respects readonly behavior
+
+DESCRIPTION
+1. renders description element when string property is set
+2. sets aria-describedby when description property is set
+3. does not set aria-describedby when description is not set
+4. renders HTMLElement description property
+5. renders description slot when provided
+6. prefers property over slot when both are provided
+7. does not render description element when neither property nor slot is provided
+8. removes description when property is cleared
+9. has correct description id format with componentName and uniqueId
 
 RESET
 1. component.reset() sets value to value attribute

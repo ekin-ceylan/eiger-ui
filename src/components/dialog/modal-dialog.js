@@ -2,6 +2,7 @@ import { html, nothing } from 'lit';
 import SlotCollectorMixin from '../../mixins/slot-collector-mixin.js';
 import { hideBodyScroll, showBodyScroll } from '../../modules/scroll-lock-helper.js';
 import { lightMixins } from '../../modules/mixin-utils.js';
+import Keys from '../../enums/Keys.js';
 
 /**
  * Custom modal dialog component that extends LightComponentBase and uses SlotCollectorMixin to manage its content. It provides features such as backdrop click to close, Escape key to close, and customizable header and footer rendering.
@@ -57,6 +58,12 @@ export default class ModalDialog extends lightMixins(SlotCollectorMixin) {
         this.#dialog = this.renderRoot.querySelector('dialog');
 
         this.#dialog?.addEventListener('cancel', e => {
+            e.preventDefault(); // prevent browser to close modal immediately
+            if (this.escClose) this.hide();
+        });
+
+        this.#dialog?.addEventListener('keydown', e => {
+            if (e.code !== Keys.ESCAPE) return;
             e.preventDefault(); // prevent browser to close modal immediately
             if (this.escClose) this.hide();
         });

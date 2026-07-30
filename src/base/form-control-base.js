@@ -2,7 +2,7 @@ import { html, nothing } from 'lit';
 import PropValidatorMixin from '../mixins/prop-validator-mixin.js';
 import UniqueIdGeneratorMixin from '../mixins/unique-id-generator-mixin.js';
 import { lightMixins } from '../modules/mixin-utils.js';
-import { ifDefined, isEmpty } from '../modules/utilities.js';
+import { ifDefined } from '../modules/utilities.js';
 
 /**
  * Base class for form control components providing common functionality for form inputs and selects.

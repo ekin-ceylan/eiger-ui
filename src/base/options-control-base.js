@@ -40,7 +40,6 @@ export default class OptionsControlBase extends mixins(StandardControlBase, Slot
     /**
      * Renders the indicator icon for the control, typically a chevron or arrow, indicating that the control can be expanded or collapsed.
      * This method can be overridden in subclasses to provide a custom indicator.
-     * @protected
      * @returns {import('lit').TemplateResult | typeof nothing}
      */
     renderIndicator() {

@@ -83,49 +83,47 @@ export default class StandardControlBase extends FormControlBase {
      *
      * Implementation example for a required field with an asterisk:
      * ```javascript
-     * renderLabelText() {
+     * renderLabelContent() {
      *     return html`${this.label}${this.required ? html`<span>*</span>` : nothing}`;
      * }
      * ```
-     * @protected
      * @category rendering
      * @return {import('lit').TemplateResult | string | typeof nothing}
      */
-    renderLabelText() {
+    renderLabelContent() {
         return this.label;
     }
 
     /**
-     * Renders the label element for the input field. If `hideLabel` is true, it returns `nothing`, effectively hiding the label visually. Otherwise, it renders a `<label>` element with the appropriate `id` and `for` attributes, and includes the label text rendered by `renderLabelText()`.
+     * Renders the label element for the input field. If `hideLabel` is true, it returns `nothing`, effectively hiding the label visually. Otherwise, it renders a `<label>` element with the appropriate `id` and `for` attributes, and includes the label text rendered by `renderLabelContent()`.
      * @protected
      * @category rendering
      * @return {import('lit').TemplateResult | typeof nothing}
      */
     renderLabel() {
-        return this.hideLabel ? nothing : html`<label id=${this.labelId} for=${this.fieldId}>${this.renderLabelText()}</label>`;
+        return this.hideLabel ? nothing : html`<label id=${this.labelId} for=${this.fieldId}>${this.renderLabelContent()}</label>`;
     }
 
     /**
-     * Renders the text for the clear button. By default, it returns a multiplication sign (`&times;`), but can be overridden by subclasses to provide custom clear button text or icons.
+     * Renders the text for the clear button. By default, it returns a multiplication sign (`&times;`), but can be overridden to provide custom clear button text or icons.
      * @example
-     * renderClearButtonText() {
+     * renderClearButtonContent() {
      *     return html`<svg ...>...</svg>`; // Custom SVG icon for clear button
      * }
      *
      * @example
-     * renderClearButtonText() {
+     * renderClearButtonContent() {
      *     return 'Clear'; // Custom text for clear button
      * }
-     * @protected
      * @category rendering
      * @return {import('lit').TemplateResult | string | typeof nothing}
      */
-    renderClearButtonText() {
+    renderClearButtonContent() {
         return html`&times;`;
     }
 
     /**
-     * Renders the clear button for the input field. If `clearable` is false, or the input is `readonly` or `disabled`, it returns `nothing`. Otherwise, it renders a `<button>` element with the appropriate ARIA attributes and event listeners, and includes the clear button text rendered by `renderClearButtonText()`.
+     * Renders the clear button for the input field. If `clearable` is false, or the input is `readonly` or `disabled`, it returns `nothing`. Otherwise, it renders a `<button>` element with the appropriate ARIA attributes and event listeners, and includes the clear button text rendered by `renderClearButtonContent()`.
      * @protected
      * @category rendering
      * @return {import('lit').TemplateResult | typeof nothing}
@@ -136,7 +134,7 @@ export default class StandardControlBase extends FormControlBase {
 
         return html`
             <button type="button" data-clear ?disabled=${!this.value} @click=${this.onClearClick} @keydown=${this.onClearKeyDown} aria-label="${ariaLabel}">
-                ${this.renderClearButtonText()}
+                ${this.renderClearButtonContent()}
             </button>
         `;
     }

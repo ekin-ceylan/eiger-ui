@@ -79,7 +79,7 @@ export default class StandardControlBase extends FormControlBase {
     // #region RENDER HOOKS
 
     /**
-     * Renders the label text for the input field. By default, it returns the value of the `label` property, but can be overridden by subclasses to provide custom label rendering logic.
+     * Renders the label text for the input field. By default, it returns the value of the `label` property, but can be overridden to provide custom label rendering logic.
      *
      * Implementation example for a required field with an asterisk:
      * ```javascript

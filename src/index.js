@@ -2,11 +2,14 @@ export { html, LitElement, nothing } from 'lit';
 // export { Directive, directive, PartType } from 'lit/directive.js';
 
 // Utils
-export { defineComponent, isEmpty } from './modules/utilities.js';
+export { defineComponent, isEmpty, ifDefined } from './modules/utilities.js';
 export { hideBodyScroll, showBodyScroll, lockAllScrolls, unlockAllScrolls } from './modules/scroll-lock-helper.js';
 export { lightMixins, mixins } from './modules/mixin-utils.js';
 export { spread } from './modules/spread.js';
 export { getLocale, setLocale, configure, registerLocale, getMessages, getMessage } from './i18n/locale.js';
+
+// Constants
+export { default as Keys } from './enums/Keys.js';
 
 // Models
 export { default as Option } from './models/Option.js';

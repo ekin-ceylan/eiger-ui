@@ -221,7 +221,7 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
         }
 
         if (node.nodeType === Node.TEXT_NODE) {
-            this.#slotContent += node.textContent ?? '';
+            this.#slotContent += node.textContent.trim() ?? '';
         } else if (node.nodeType === Node.ELEMENT_NODE) {
             this.#slotContent += /** @type {HTMLElement} */ (node).outerHTML ?? '';
         }

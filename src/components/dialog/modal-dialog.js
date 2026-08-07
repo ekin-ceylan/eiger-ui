@@ -3,18 +3,20 @@ import SlotCollectorMixin from '../../mixins/slot-collector-mixin.js';
 import { hideBodyScroll, showBodyScroll } from '../../modules/scroll-lock-helper.js';
 import { lightMixins } from '../../modules/mixin-utils.js';
 import Keys from '../../enums/Keys.js';
+import { spread } from '../../modules/spread.js';
 
 /**
  * Custom modal dialog component that extends LightComponentBase and uses SlotCollectorMixin to manage its content. It provides features such as backdrop click to close, Escape key to close, and customizable header and footer rendering.
  * - Can be used after defining like `defineElement('modal-dialog', ModalDialog)` or `customElement.define('modal-dialog', ModalDialog)`.
  * - For defining a close button, use `data-role="close"` attribute on the button element. The default implementation provides a close button in the header.
+ * - Can be added any attributes to the `<dialog>` element using `dialog:<attr>=<value>` way.
  * - The `open` attribute controls the visibility of the dialog.
  * - The `backdrop-close` attribute allows closing the dialog by clicking on the backdrop area.
  * - The `esc-close` attribute allows closing the dialog by pressing the Escape key.
  * - The `renderHeader()` method can be overridden to customize the dialog header, and `renderFooter()` for the footer. By default, a close button is provided in the header, and the footer is empty.
  * @example
  * ```html
- * <modal-dialog backdrop-close esc-close>
+ * <modal-dialog dialog:class="modal-lg" backdrop-close esc-close>
  *     <h2>Dialog Title</h2>
  *     <p>Dialog content goes here.</p>
  *     <button slot="footer" ⁣@click="this.hide()">Close</button>
@@ -213,7 +215,7 @@ export default class ModalDialog extends lightMixins(SlotCollectorMixin) {
      */
     render() {
         // prettier-ignore
-        return html`<dialog role="dialog" aria-modal="true" tabindex="-1">
+        return html`<dialog ${spread(this.getScopedAttrs('dialog'))} role="dialog" aria-modal="true" tabindex="-1">
             ${this.renderHeader()}
             ${this.renderBody()}
             ${this.renderFooter()}

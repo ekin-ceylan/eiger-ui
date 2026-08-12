@@ -284,11 +284,13 @@ export default class TextControlBase extends StandardControlBase {
 
     /** @inheritdoc */
     validate(value) {
-        if (this.required && !value) return this.requiredValidationMessage;
+        const noValue = isEmpty(value);
+
+        if (this.required && noValue) return this.requiredValidationMessage;
         if (value?.length > 0 && value?.length < this.minlength) return this.minLengthValidationMessage;
         if (value?.length > this.maxlength) return this.maxLengthValidationMessage;
-        if (Number(value) > this.max) return this.maxValueValidationMessage;
-        if (Number(value) < this.min) return this.minValueValidationMessage;
+        if (!noValue && Number(value) > this.max) return this.maxValueValidationMessage;
+        if (!noValue && Number(value) < this.min) return this.minValueValidationMessage;
         if (!this.#validatePattern(value)) return this.patternValidationMessage;
 
         return '';

@@ -25,291 +25,276 @@ describe('Component contract', () => {
 });
 
 describe('Validation Tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {TextBox} */
-    let host;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
-    let errorElement;
-
-    const getErrorElement = () => host.querySelector('[data-role="error-message"]');
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        [input, host, user] = await initInputBase('<text-box label="Name" pattern="[A-Za-z]{5}" required minlength="3" maxlength="5"></text-box>');
-        errorElement = getErrorElement();
+        fixture = await initTestFixture('<text-box label="Name" pattern="[A-Za-z]{5}" required minlength="3" maxlength="5"></text-box>');
     });
 
     it('Required validation should show error when value is missing', async () => {
-        await user.type(input, 'x');
-        await user.clear(input);
-        await user.tab();
+        await fixture.user.type(fixture.input, 'x');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
 
-        expect(input.validity.valueMissing).toBe(true);
-        errorElement = getErrorElement();
-        expect(errorElement).not.toBeNull();
-        expect(errorElement.textContent.trim()).toContain('zorunludur');
+        expect(fixture.input.validity.valueMissing).toBe(true);
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.error.textContent.trim()).toContain('zorunludur');
     });
 
     it('minlength kontrolü', async () => {
-        await user.type(input, 'a');
-        await user.tab(); // focus'tan çık
+        await fixture.user.type(fixture.input, 'a');
+        await fixture.user.tab(); // focus'tan çık
 
-        errorElement = getErrorElement();
-        expect(errorElement).not.toBeNull();
-        expect(errorElement.textContent.trim()).toContain('en az');
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.error.textContent.trim()).toContain('en az');
     });
 
     it('maxlength prevents input beyond max length, does not show error message', async () => {
-        await user.type(input, 'abcdef');
-        await user.tab(); // focus'tan çık
+        await fixture.user.type(fixture.input, 'abcdef');
+        await fixture.user.tab(); // focus'tan çık
 
-        expect(input.value).toBe('abcde');
-        expect(getErrorElement()).toBeNull();
+        expect(fixture.input.value).toBe('abcde');
+        expect(fixture.error).toBeNull();
     });
 
     it('validation is not checked immediately if it is valid or not checked', async () => {
-        await user.type(input, 'abc');
+        await fixture.user.type(fixture.input, 'abc');
 
-        expect(input.value).toBe('abc');
-        expect(getErrorElement()).toBeNull();
+        expect(fixture.input.value).toBe('abc');
+        expect(fixture.error).toBeNull();
     });
 
     it('validation is checked immediately if it is not valid', async () => {
-        await user.type(input, 'abc');
-        await user.tab(); // focus'tan çık
+        await fixture.user.type(fixture.input, 'abc');
+        await fixture.user.tab(); // focus'tan çık
 
-        errorElement = getErrorElement();
-        expect(errorElement).not.toBeNull();
+        expect(fixture.error).not.toBeNull();
 
-        await user.type(input, 'de');
+        await fixture.user.type(fixture.input, 'de');
 
-        expect(input.value).toBe('abcde');
-        expect(getErrorElement()).toBeNull();
+        expect(fixture.input.value).toBe('abcde');
+        expect(fixture.error).toBeNull();
     });
 
     it('if input is required and it gets empty, validation is shown immediately', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" required></text-box>');
+        fixture = await initTestFixture('<text-box label="Name" required></text-box>');
 
-        await user.type(input, 'abc');
+        await fixture.user.type(fixture.input, 'abc');
 
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
+        expect(fixture.error).toBeNull();
 
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        expect(input.value).toBe('');
-        const errorElement = host.querySelector('[data-role="error-message"]');
-        expect(errorElement).not.toBeNull();
+        expect(fixture.input.value).toBe('');
+        expect(fixture.error).not.toBeNull();
     });
 
     // pattern attr göre validasyon ve hata mesajı
     it('pattern with punctuation should fail validation', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" pattern="[a-zA-ZçÇğĞıİöÖşŞüÜâÂîÎ -]+"></text-box>');
+        fixture = await initTestFixture('<text-box label="Name" pattern="[a-zA-ZçÇğĞıİöÖşŞüÜâÂîÎ -]+"></text-box>');
 
-        await user.type(input, 'Hello, world!');
-        await user.tab(); // blur to trigger validation
-        // await host.updateComplete;
+        await fixture.user.type(fixture.input, 'Hello, world!');
+        await fixture.user.tab(); // blur to trigger validation
 
-        const errorElement = host.querySelector('[data-role="error-message"]');
-        expect(errorElement).not.toBeNull();
-        expect(errorElement.textContent.trim()).toMatch(/gereklidir|Lütfen/);
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.error.textContent.trim()).toMatch(/gereklidir|Lütfen/);
     });
 });
 
 describe('Accessibility (A11y) tests', () => {
     it('associates <label> with <input> via for/id and aria-labelledby', async () => {
-        const [input, host] = await initInputBase('<text-box label="Email"></text-box>');
-        const expectedFieldId = host.fieldId;
-        const expectedLabelId = host.labelId;
+        const fixture = await initTestFixture('<text-box label="Email"></text-box>');
+        const expectedFieldId = fixture.host.fieldId;
+        const expectedLabelId = fixture.host.labelId;
 
         // Visible label should be linked to the input.
-        const label = host.querySelector('label');
-        expect(label).not.toBeNull();
-        expect(label.getAttribute('for')).toBe(expectedFieldId);
-        expect(label.id).toBe(expectedLabelId);
+        expect(fixture.label).not.toBeNull();
+        expect(fixture.label.getAttribute('for')).toBe(expectedFieldId);
+        expect(fixture.label.id).toBe(expectedLabelId);
 
-        expect(input.id).toBe(expectedFieldId);
-        expect(input.getAttribute('aria-labelledby')).toBe(expectedLabelId);
+        expect(fixture.input.id).toBe(expectedFieldId);
+        expect(fixture.input.getAttribute('aria-labelledby')).toBe(expectedLabelId);
         // When label is visible, aria-label should not be used.
-        expect(input.hasAttribute('aria-label')).toBe(false);
+        expect(fixture.input.hasAttribute('aria-label')).toBe(false);
     });
 
     it('uses aria-label when hide-label is enabled (no visible label)', async () => {
-        const [input, host] = await initInputBase('<text-box label="Email" hide-label></text-box>');
+        const fixture = await initTestFixture('<text-box label="Email" hide-label></text-box>');
 
         // No visible label rendered.
-        expect(host.querySelector('label')).toBeNull();
+        expect(fixture.label).toBeNull();
 
         // Accessible name should come from aria-label.
-        expect(input.getAttribute('aria-label')).toBe('Email');
-        expect(input.hasAttribute('aria-labelledby')).toBe(false);
+        expect(fixture.input.getAttribute('aria-label')).toBe('Email');
+        expect(fixture.input.hasAttribute('aria-labelledby')).toBe(false);
     });
 
     it('sets aria-required="false" when required is not set', async () => {
-        const [input] = await initInputBase('<text-box label="Name"></text-box>');
-        expect(input.getAttribute('aria-required')).toBe('false');
-        expect(input.required).toBe(false);
+        const fixture = await initTestFixture('<text-box label="Name"></text-box>');
+
+        expect(fixture.input.getAttribute('aria-required')).toBe('false');
+        expect(fixture.input.required).toBe(false);
     });
 
     it('wires aria-errormessage to the error element id', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" required></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" required></text-box>');
 
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.error).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
 
-        await user.type(input, 'x');
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, 'x');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        const error = host.querySelector('[data-role="error-message"]');
-        expect(error).not.toBeNull();
-        expect(error.id).toBe(host.errorId);
-        expect(input.getAttribute('aria-errormessage')).toBe(host.errorId);
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.error.id).toBe(fixture.host.errorId);
+        expect(fixture.input.getAttribute('aria-errormessage')).toBe(fixture.host.errorId);
 
         // Live region is important for announcing validation updates.
-        expect(error.getAttribute('aria-live')).toBe('assertive');
+        expect(fixture.error.getAttribute('aria-live')).toBe('assertive');
     });
 
     it('removes aria-errormessage again when the field becomes valid', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" required minlength="3"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" required minlength="3"></text-box>');
 
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
 
-        await user.type(input, 'x');
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, 'x');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        expect(input.getAttribute('aria-errormessage')).toBe(host.errorId);
-        expect(host.querySelector('[data-role="error-message"]')).not.toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBe(fixture.host.errorId);
+        expect(fixture.error).not.toBeNull();
 
-        input.focus();
-        await user.type(input, 'abc');
-        await user.tab();
-        await host.updateComplete;
+        fixture.input.focus();
+        await fixture.user.type(fixture.input, 'abc');
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.error).toBeNull();
     });
 
     it('keeps accessible name coming from the label even when placeholder is present', async () => {
-        const [input, host] = await initInputBase('<text-box label="Name" placeholder="Type here"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" placeholder="Type here"></text-box>');
 
         // Placeholder should be forwarded, but it should not replace the accessible name.
-        expect(input.getAttribute('placeholder')).toBe('Type here');
-        expect(host.querySelector('label')).not.toBeNull();
-        expect(input.hasAttribute('aria-label')).toBe(false);
-        expect(input.getAttribute('aria-labelledby')).toBe(host.labelId);
+        expect(fixture.input.getAttribute('placeholder')).toBe('Type here');
+        expect(fixture.label).not.toBeNull();
+        expect(fixture.input.hasAttribute('aria-label')).toBe(false);
+        expect(fixture.input.getAttribute('aria-labelledby')).toBe(fixture.host.labelId);
     });
 
     it('forwards helper attributes: autocomplete, spellcheck, inputmode', async () => {
-        const [input] = await initInputBase('<text-box label="Name" autocomplete="name" inputmode="text" spellcheck></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" autocomplete="name" inputmode="text" spellcheck></text-box>');
 
-        expect(input.getAttribute('autocomplete')).toBe('name');
-        expect(input.getAttribute('inputmode')).toBe('text');
+        expect(fixture.input.getAttribute('autocomplete')).toBe('name');
+        expect(fixture.input.getAttribute('inputmode')).toBe('text');
         // spellcheck is reflected; different environments may serialize it as "" or "true".
-        expect(input.hasAttribute('spellcheck')).toBe(true);
-        expect(input.spellcheck).toBe(true);
+        expect(fixture.input.hasAttribute('spellcheck')).toBe(true);
+        expect(fixture.input.spellcheck).toBe(true);
     });
 
     it('is keyboard reachable and blur triggers validation UI updates', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" required></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" required></text-box>');
 
         // Ensure input can receive focus via keyboard navigation.
-        input.blur();
-        expect(document.activeElement).not.toBe(input);
-        await user.tab();
-        expect(document.activeElement).toBe(input);
+        fixture.input.blur();
+        expect(document.activeElement).not.toBe(fixture.input);
+        await fixture.user.tab();
+        expect(document.activeElement).toBe(fixture.input);
 
         // Blurring should run validity check and show the error.
-        await user.type(input, 'x');
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
-        const error = host.querySelector('[data-role="error-message"]');
-        expect(input.getAttribute('aria-invalid')).toBe('true');
+        await fixture.user.type(fixture.input, 'x');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
+        const error = fixture.error;
+
+        expect(fixture.input.getAttribute('aria-invalid')).toBe('true');
         expect(error).not.toBeNull();
     });
 
     it('toggles aria-invalid when validation state changes', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" required minlength="3"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" required minlength="3"></text-box>');
 
         // Trigger invalid state.
-        await user.type(input, 'x');
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
-        expect(input.getAttribute('aria-invalid')).toBe('true');
-        let error = host.querySelector('[data-role="error-message"]');
-        expect(error).not.toBeNull();
+        await fixture.user.type(fixture.input, 'x');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
+
+        expect(fixture.input.getAttribute('aria-invalid')).toBe('true');
+        expect(fixture.error).not.toBeNull();
 
         // Fix the value, then blur again.
-        input.focus();
-        await user.type(input, 'abc');
-        await user.tab();
-        await host.updateComplete;
+        fixture.input.focus();
+        await fixture.user.type(fixture.input, 'abc');
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
         // When valid again, aria-invalid should be removed.
-        expect(input.getAttribute('aria-invalid')).toBeNull();
-        error = host.querySelector('[data-role="error-message"]');
-        expect(error).toBeNull();
+        expect(fixture.input.getAttribute('aria-invalid')).toBeNull();
+        expect(fixture.error).toBeNull();
     });
 
     it('prevents focus when disabled', async () => {
-        const [input] = await initInputBase('<text-box label="X" disabled></text-box>');
+        const fixture = await initTestFixture('<text-box label="X" disabled></text-box>');
 
         // Disabled inputs are not focusable.
-        expect(input.disabled).toBe(true);
-        input.focus();
-        expect(document.activeElement).not.toBe(input);
+        expect(fixture.input.disabled).toBe(true);
+        fixture.input.focus();
+        expect(document.activeElement).not.toBe(fixture.input);
     });
 });
 
 // mask pattern ekle
 describe('Allow Pattern Tests', () => {
     it('does not filter when allow-pattern is empty', async () => {
-        const [input, , user] = await initInputBase('<text-box label="Name" allow-pattern=""></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" allow-pattern=""></text-box>');
 
-        await user.type(input, 'a1b2');
+        await fixture.user.type(fixture.input, 'a1b2');
 
-        expect(input.value).toBe('a1b2');
+        expect(fixture.input.value).toBe('a1b2');
     });
 
     it('filters disallowed characters on typing', async () => {
-        const [input, , user] = await initInputBase('<text-box label="Name" allow-pattern="[0-9]"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" allow-pattern="[0-9]"></text-box>');
 
-        await user.type(input, 'a1b2');
+        await fixture.user.type(fixture.input, 'a1b2');
 
-        expect(input.value).toBe('12');
+        expect(fixture.input.value).toBe('12');
     });
 
     it('filters disallowed characters on paste', async () => {
-        const [input, , user] = await initInputBase('<text-box label="Name" allow-pattern="[0-9]"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" allow-pattern="[0-9]"></text-box>');
 
-        await user.paste('a1b2');
+        await fixture.user.paste('a1b2');
 
-        expect(input.value).toBe('12');
+        expect(fixture.input.value).toBe('12');
     });
 
     it('starts filtering when allow-pattern is set after connect', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name"></text-box>');
 
-        host.setAttribute('allow-pattern', '[0-9]');
-        await user.type(input, 'a1b2');
+        fixture.host.setAttribute('allow-pattern', '[0-9]');
+        await fixture.user.type(fixture.input, 'a1b2');
 
-        expect(input.value).toBe('12');
+        expect(fixture.input.value).toBe('12');
     });
 
     it('stops filtering when allow-pattern is removed after connect', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" allow-pattern="[0-9]"></text-box>');
-        host.removeAttribute('allow-pattern');
+        const fixture = await initTestFixture('<text-box label="Name" allow-pattern="[0-9]"></text-box>');
+        fixture.host.removeAttribute('allow-pattern');
 
-        await user.type(input, 'a1');
+        await fixture.user.type(fixture.input, 'a1');
 
-        expect(input.value).toBe('a1');
+        expect(fixture.input.value).toBe('a1');
     });
 
     it('throws when allow-pattern is invalid', async () => {
@@ -333,119 +318,131 @@ describe('Reset Tests', () => {
         document.body.innerHTML = '';
     });
 
-    it('component.reset() sets value to the value attribute', async () => {
-        const [, host] = await initInputBase('<text-box label="Name" value="initial"></text-box>');
+    it('component.reset() sets value to the value attribute even if value has not changed', async () => {
+        const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
 
-        host.value = 'changed';
-        await host.updateComplete;
+        await fixture.host.reset();
 
-        await host.reset();
+        expect(fixture.host.value).toBe('initial');
+        expect(fixture.host.inputElement.value).toBe('initial');
+    });
 
-        expect(host.value).toBe('initial');
+    it('component.reset() sets value to the value attribute after value changed', async () => {
+        const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
+
+        fixture.host.value = 'changed';
+        await fixture.host.updateComplete;
+
+        await fixture.host.reset();
+
+        expect(fixture.host.value).toBe('initial');
     });
 
     it('component.reset() syncs inner input value to the value attribute', async () => {
-        const [input, host] = await initInputBase('<text-box label="Name" value="initial"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
 
-        host.value = 'changed';
-        await host.updateComplete;
+        fixture.host.value = 'changed';
+        await fixture.host.updateComplete;
 
-        await host.reset();
-        await host.updateComplete;
+        await fixture.host.reset();
+        await fixture.host.updateComplete;
 
-        expect(input.value).toBe('initial');
+        expect(fixture.input.value).toBe('initial');
     });
 
     it('component.reset() clears invalid state and error message', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name" required></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name" required></text-box>');
 
-        await user.type(input, 'x');
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, 'x');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        expect(host.invalid).toBe(true);
-        expect(host.querySelector('[data-role="error-message"]')).not.toBeNull();
+        expect(fixture.host.invalid).toBe(true);
+        expect(fixture.error).not.toBeNull();
 
-        await host.reset();
-        await host.updateComplete;
+        await fixture.host.reset();
+        await fixture.host.updateComplete;
 
-        expect(host.invalid).toBe(false);
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
+        expect(fixture.host.invalid).toBe(false);
+        expect(fixture.error).toBeNull();
     });
 
     it('component.reset() resets interacted to false', async () => {
-        const [input, host, user] = await initInputBase('<text-box label="Name"></text-box>');
+        const fixture = await initTestFixture('<text-box label="Name"></text-box>');
 
-        await user.type(input, 'hello');
-        expect(host.interacted).toBe(true);
+        await fixture.user.type(fixture.input, 'hello');
+        expect(fixture.host.interacted).toBe(true);
 
-        await host.reset();
+        await fixture.host.reset();
 
-        expect(host.interacted).toBe(false);
+        expect(fixture.host.interacted).toBe(false);
+    });
+
+    it('form reset sets value to the value attribute when value has not changed', async () => {
+        const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
+
+        fixture.reset.click();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe('initial');
+        expect(fixture.input.value).toBe('initial');
     });
 
     it('form reset sets value to the value attribute', async () => {
-        document.body.innerHTML = '<form><text-box label="Name" value="initial"></text-box><button type="reset">Reset</button></form>';
-        const host = document.body.querySelector('text-box');
-        await host.updateComplete;
+        const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
 
-        host.value = 'changed';
-        await host.updateComplete;
+        fixture.host.value = 'changed';
+        await fixture.host.updateComplete;
 
-        document.body.querySelector('button[type="reset"]').click();
+        fixture.reset.click();
         await new Promise(resolve => requestAnimationFrame(resolve));
-        await host.updateComplete;
+        await fixture.host.updateComplete;
 
-        expect(host.value).toBe('initial');
+        expect(fixture.host.value).toBe('initial');
     });
 
     it('form reset syncs inner input value to the value attribute', async () => {
-        document.body.innerHTML = '<form><text-box label="Name" value="initial"></text-box><button type="reset">Reset</button></form>';
-        const host = document.body.querySelector('text-box');
-        await host.updateComplete;
+        const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
 
-        host.value = 'changed';
-        await host.updateComplete;
+        fixture.host.value = 'changed';
+        await fixture.host.updateComplete;
 
-        document.body.querySelector('button[type="reset"]').click();
+        fixture.reset.click();
         await new Promise(resolve => requestAnimationFrame(resolve));
-        await host.updateComplete;
+        await fixture.host.updateComplete;
 
-        expect(host.inputElement.value).toBe('initial');
+        expect(fixture.input.value).toBe('initial');
     });
 
     it('form reset clears invalid state', async () => {
-        document.body.innerHTML = '<form><text-box label="Name" required></text-box><button type="reset">Reset</button></form>';
-        const host = document.body.querySelector('text-box');
-        await host.updateComplete;
+        const fixture = await initTestFixture('<text-box label="Name" required></text-box>');
 
         // Trigger invalid state directly
-        host.checkValidity();
-        await host.updateComplete;
+        fixture.host.checkValidity();
+        await fixture.host.updateComplete;
 
-        expect(host.invalid).toBe(true);
+        expect(fixture.host.invalid).toBe(true);
 
-        document.body.querySelector('button[type="reset"]').click();
+        fixture.reset.click();
         await new Promise(resolve => requestAnimationFrame(resolve));
-        await host.updateComplete;
+        await fixture.host.updateComplete;
 
-        expect(host.invalid).toBe(false);
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
+        expect(fixture.host.invalid).toBe(false);
+        expect(fixture.error).toBeNull();
     });
 
     it('form reset resets interacted to false', async () => {
-        document.body.innerHTML = '<form><text-box label="Name"></text-box><button type="reset">Reset</button></form>';
-        const host = document.body.querySelector('text-box');
-        await host.updateComplete;
+        const fixture = await initTestFixture('<text-box label="Name"></text-box>');
 
         // Simulate interaction by dispatching a first-interaction event directly
-        host.dispatchEvent(new CustomEvent('first-interaction', { bubbles: true }));
-        expect(host.interacted).toBe(true);
+        fixture.host.dispatchEvent(new CustomEvent('first-interaction', { bubbles: true }));
+        expect(fixture.host.interacted).toBe(true);
 
-        document.body.querySelector('button[type="reset"]').click();
+        fixture.reset.click();
         await new Promise(resolve => requestAnimationFrame(resolve));
 
-        expect(host.interacted).toBe(false);
+        expect(fixture.host.interacted).toBe(false);
     });
 });

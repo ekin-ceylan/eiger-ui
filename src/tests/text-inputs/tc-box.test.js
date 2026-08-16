@@ -3,36 +3,36 @@ import TcBox from '../../components/text-input/tc-box.js';
 defineElement('tc-box', TcBox);
 
 describe('TcBox: Masking tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {TcBox} */
-    let host;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        [input, host, user] = await initInputBase('<tc-box field-id="tc" label="TC Kimlik"></tc-box>');
+        fixture = await initTestFixture('<tc-box field-id="tc" label="TC Kimlik"></tc-box>');
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
     });
 
     it('accepts only digits while typing', async () => {
-        await user.type(input, '10a0b00000x146!');
+        await fixture.user.type(fixture.input, '10a0b00000x146!');
 
-        expect(input.value).toBe('10000000146');
-        expect(host.value).toBe('10000000146');
+        expect(fixture.input.value).toBe('10000000146');
+        expect(fixture.host.value).toBe('10000000146');
     });
 
     it('does not allow more than 11 digits', async () => {
-        await user.type(input, '10000000146123');
+        await fixture.user.type(fixture.input, '10000000146123');
 
-        expect(input.value).toBe('10000000146');
-        expect(input.value.length).toBe(11);
+        expect(fixture.input.value).toBe('10000000146');
+        expect(fixture.input.value.length).toBe(11);
     });
 
     it('shows underlay mask after input with remaining underscores', async () => {
-        await user.type(input, '1000');
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, '1000');
+        await fixture.host.updateComplete;
 
-        const underlay = host.querySelector('[data-role="underlay"]');
+        const underlay = fixture.host.querySelector('[data-role="underlay"]');
         expect(underlay).not.toBeNull();
 
         const parts = underlay.querySelectorAll('pre');
@@ -43,35 +43,33 @@ describe('TcBox: Masking tests', () => {
 });
 
 describe('TcBox: Validation tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {TcBox} */
-    let host;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
-
-    const getErrorElement = () => host.querySelector('[data-role="error-message"]');
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        [input, host, user] = await initInputBase('<tc-box field-id="tc" label="TC Kimlik" required></tc-box>');
+        fixture = await initTestFixture('<tc-box field-id="tc" label="TC Kimlik" required></tc-box>');
+    });
+
+    afterEach(() => {
+        document.body.innerHTML = '';
     });
 
     it('shows required validation when empty', async () => {
-        await user.type(input, '3');
-        await user.clear(input);
-        await user.tab();
+        await fixture.user.type(fixture.input, '3');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
 
-        expect(input.validity.valueMissing).toBe(true);
-        expect(getErrorElement()).not.toBeNull();
-        expect(getErrorElement().textContent).toContain('zorunludur');
+        expect(fixture.input.validity.valueMissing).toBe(true);
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.error.textContent).toContain('zorunludur');
     });
 
     it('accepts a valid Turkish ID', async () => {
-        await user.type(input, '10000000146');
-        await user.tab();
+        await fixture.user.type(fixture.input, '10000000146');
+        await fixture.user.tab();
 
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
+        expect(fixture.error).toBeNull();
+        expect(fixture.host.invalid).toBe(false);
     });
 
     it.each([
@@ -79,19 +77,20 @@ describe('TcBox: Validation tests', () => {
         ['rejects an ID that starts with 0', '01234567890', 'Lütfen geçerli bir TC Kimlik giriniz.'],
         ['keeps minlength validation for incomplete values', '1234567890', 'en az'],
     ])('%s', async (_title, value, expectedErrorText) => {
-        await user.type(input, value);
-        await user.tab();
+        await fixture.user.type(fixture.input, value);
+        await fixture.user.tab();
 
-        const error = getErrorElement();
+        const error = fixture.error;
         expect(error).not.toBeNull();
-        expect(host.invalid).toBe(true);
+        expect(fixture.host.invalid).toBe(true);
         expect(error.textContent).toContain(expectedErrorText);
     });
 });
 
 describe('TcBox: Attribute forwarding', () => {
     it('forwards numeric and length constraints', async () => {
-        const [input] = await initInputBase('<tc-box field-id="tc" label="TC Kimlik"></tc-box>');
+        const fixture = await initTestFixture('<tc-box field-id="tc" label="TC Kimlik"></tc-box>');
+        const input = fixture.input;
 
         expect(input.getAttribute('inputmode')).toBe('numeric');
         expect(input.minLength).toBe(11);

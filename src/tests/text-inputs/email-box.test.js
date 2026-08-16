@@ -3,270 +3,213 @@ import EmailBox from '../../components/text-input/email-box.js';
 defineElement('email-box', EmailBox);
 
 describe('EmailBox: Masking Tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
         const el = '<email-box label="E-Posta Adresi"></email-box>';
-        [input, , user] = await initInputBase(el);
+        fixture = await initTestFixture(el);
     });
 
     it('converts uppercase to lowercase when typing', async () => {
-        await user.type(input, 'EXAMPLE@EXAMPLE.COM');
+        await fixture.user.type(fixture.input, 'EXAMPLE@EXAMPLE.COM');
 
-        expect(input.value).toBe('example@example.com');
+        expect(fixture.input.value).toBe('example@example.com');
     });
 
     it('converts uppercase to lowercase on paste', async () => {
-        await user.paste('TEST@DOMAIN.COM');
+        await fixture.user.paste('TEST@DOMAIN.COM');
 
-        expect(input.value).toBe('test@domain.com');
+        expect(fixture.input.value).toBe('test@domain.com');
     });
 
     it('converts mixed case to lowercase', async () => {
-        await user.type(input, 'Test.User@Example.COM');
+        await fixture.user.type(fixture.input, 'Test.User@Example.COM');
 
-        expect(input.value).toBe('test.user@example.com');
+        expect(fixture.input.value).toBe('test.user@example.com');
     });
 
     it('rejects space character on keydown', async () => {
-        await user.type(input, 'test user@example.com');
+        await fixture.user.type(fixture.input, 'test user@example.com');
 
         // Spaces should be filtered out
-        expect(input.value).toBe('testuser@example.com');
+        expect(fixture.input.value).toBe('testuser@example.com');
     });
 
     it('allows special characters valid in email local part', async () => {
-        await user.type(input, 'user+tag@example.com');
+        await fixture.user.type(fixture.input, 'user+tag@example.com');
 
-        expect(input.value).toBe('user+tag@example.com');
+        expect(fixture.input.value).toBe('user+tag@example.com');
     });
 
     it('allows dots and hyphens in email', async () => {
-        await user.type(input, 'first.last@sub-domain.example.com');
+        await fixture.user.type(fixture.input, 'first.last@sub-domain.example.com');
 
-        expect(input.value).toBe('first.last@sub-domain.example.com');
+        expect(fixture.input.value).toBe('first.last@sub-domain.example.com');
     });
 });
 
 describe('EmailBox: Validation Tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {EmailBox} */
-    let host;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
-
-    const getErrorElement = () => host.querySelector('[data-role="error-message"]');
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
         const el = '<email-box label="E-Posta Adresi" required></email-box>';
-        [input, host, user] = await initInputBase(el);
+        fixture = await initTestFixture(el);
     });
 
     it('does not show required error before first input interaction', async () => {
-        await user.tab();
+        await fixture.user.tab();
 
-        expect(input.validity.valueMissing).toBe(true);
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
+        expect(fixture.input.validity.valueMissing).toBe(true);
+        expect(fixture.error).toBeNull();
+        expect(fixture.host.invalid).toBe(false);
     });
 
-    it('accepts valid email format', async () => {
-        await user.type(input, 'user@example.com');
-        await user.tab();
+    it.each(['user@example.com', 'user@mail.example.com', 'user+tag@example.com', 'first.last@example.com'])('accepts valid email format: %s', async email => {
+        await fixture.user.type(fixture.input, email);
+        await fixture.user.tab();
 
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
-    });
-
-    it('accepts email with subdomain', async () => {
-        await user.type(input, 'user@mail.example.com');
-        await user.tab();
-
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
-    });
-
-    it('accepts email with plus sign (tag)', async () => {
-        await user.type(input, 'user+tag@example.com');
-        await user.tab();
-
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
-    });
-
-    it('accepts email with dots in local part', async () => {
-        await user.type(input, 'first.last@example.com');
-        await user.tab();
-
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
+        expect(fixture.error).toBeNull();
+        expect(fixture.host.invalid).toBe(false);
     });
 
     it('rejects email without @ symbol', async () => {
-        await user.type(input, 'invalidemail.com');
-        await user.tab();
+        await fixture.user.type(fixture.input, 'invalidemail.com');
+        await fixture.user.tab();
 
-        const errorElement = getErrorElement();
-        expect(errorElement).not.toBeNull();
-        expect(host.invalid).toBe(true);
-        expect(errorElement.textContent).toContain('geçerli');
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.host.invalid).toBe(true);
+        expect(fixture.error.textContent).toContain('geçerli');
     });
 
-    it('rejects email without domain', async () => {
-        await user.type(input, 'user@');
-        await user.tab();
+    it.each(['user@', '@example.com', 'user@@example.com', 'user..name@example.com'])('rejects invalid email format: %s', async email => {
+        await fixture.user.type(fixture.input, email);
+        await fixture.user.tab();
 
-        expect(getErrorElement()).not.toBeNull();
-        expect(host.invalid).toBe(true);
-    });
-
-    it('rejects email without local part', async () => {
-        await user.type(input, '@example.com');
-        await user.tab();
-
-        expect(getErrorElement()).not.toBeNull();
-        expect(host.invalid).toBe(true);
-    });
-
-    it('rejects email with double @', async () => {
-        await user.type(input, 'user@@example.com');
-        await user.tab();
-
-        expect(getErrorElement()).not.toBeNull();
-        expect(host.invalid).toBe(true);
-    });
-
-    it('rejects email with consecutive dots', async () => {
-        await user.type(input, 'user..name@example.com');
-        await user.tab();
-
-        expect(getErrorElement()).not.toBeNull();
-        expect(host.invalid).toBe(true);
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.host.invalid).toBe(true);
     });
 
     it('respects maxlength constraint (254 characters)', async () => {
         // Create a string longer than 254 chars
         const longEmail = 'a'.repeat(240) + '@example.com'; // 252 chars total
 
-        await user.type(input, longEmail);
+        await fixture.user.type(fixture.input, longEmail);
 
         // maxlength should prevent typing beyond 254
-        expect(input.value.length).toBeLessThanOrEqual(254);
+        expect(fixture.input.value.length).toBeLessThanOrEqual(254);
     });
 
     it('shows validation immediately after invalid becomes valid', async () => {
-        await user.type(input, 'invalid');
-        await user.tab();
+        await fixture.user.type(fixture.input, 'invalid');
+        await fixture.user.tab();
 
-        expect(getErrorElement()).not.toBeNull();
+        expect(fixture.error).not.toBeNull();
 
-        input.focus();
-        await user.type(input, '@example.com');
+        fixture.input.focus();
+        await fixture.user.type(fixture.input, '@example.com');
 
         // Should validate immediately since it was previously invalid
-        expect(getErrorElement()).toBeNull();
+        expect(fixture.error).toBeNull();
     });
 });
 
 describe('EmailBox: Attribute Forwarding', () => {
     it('sets inputmode="email" by default', async () => {
-        const [input] = await initInputBase('<email-box label="Email"></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email"></email-box>');
 
-        expect(input.getAttribute('inputmode')).toBe('email');
+        expect(fixture.input.getAttribute('inputmode')).toBe('email');
     });
 
     it('sets autocomplete="email" by default', async () => {
-        const [input] = await initInputBase('<email-box label="Email"></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email"></email-box>');
 
-        expect(input.getAttribute('autocomplete')).toBe('email');
+        expect(fixture.input.getAttribute('autocomplete')).toBe('email');
     });
 
     it('sets maxlength=254 by default', async () => {
-        const [input] = await initInputBase('<email-box label="Email"></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email"></email-box>');
 
-        expect(input.maxLength).toBe(254);
+        expect(fixture.input.maxLength).toBe(254);
     });
 
     it('allows overriding placeholder attribute', async () => {
-        const [input] = await initInputBase('<email-box label="Email" placeholder="Enter your email"></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email" placeholder="Enter your email"></email-box>');
 
-        expect(input.getAttribute('placeholder')).toBe('Enter your email');
+        expect(fixture.input.getAttribute('placeholder')).toBe('Enter your email');
     });
 });
 
 describe('EmailBox: Accessibility (A11y)', () => {
     it('maintains proper label association', async () => {
-        const [input, host] = await initInputBase('<email-box label="Email Address"></email-box>');
-        const label = host.querySelector('label');
+        const fixture = await initTestFixture('<email-box label="Email Address"></email-box>');
+        const label = fixture.host.querySelector('label');
 
-        expect(label.getAttribute('for')).toBe(host.fieldId);
-        expect(input.id).toBe(host.fieldId);
-        expect(input.getAttribute('aria-labelledby')).toBe(host.labelId);
+        expect(fixture.label.getAttribute('for')).toBe(fixture.host.fieldId);
+        expect(fixture.input.id).toBe(fixture.host.fieldId);
+        expect(fixture.input.getAttribute('aria-labelledby')).toBe(fixture.host.labelId);
     });
 
     it('sets aria-required when required', async () => {
-        const [input] = await initInputBase('<email-box label="Email" required></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email" required></email-box>');
 
-        expect(input.getAttribute('aria-required')).toBe('true');
-        expect(input.required).toBe(true);
+        expect(fixture.input.getAttribute('aria-required')).toBe('true');
+        expect(fixture.input.required).toBe(true);
     });
 
     it('toggles aria-invalid after input-based validation state change', async () => {
-        const [input, , user] = await initInputBase('<email-box label="Email" required></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email" required></email-box>');
 
         // Trigger invalid state after first input interaction
-        await user.type(input, 'invalid');
-        await user.tab();
-        expect(input.getAttribute('aria-invalid')).toBe('true');
+        await fixture.user.type(fixture.input, 'invalid');
+        await fixture.user.tab();
+        expect(fixture.input.getAttribute('aria-invalid')).toBe('true');
 
         // Fix the value
-        input.focus();
-        await user.type(input, 'valid@example.com');
-        await user.tab();
+        fixture.input.focus();
+        await fixture.user.type(fixture.input, 'valid@example.com');
+        await fixture.user.tab();
 
         // Should become valid
-        expect(input.getAttribute('aria-invalid')).toBeNull();
+        expect(fixture.input.getAttribute('aria-invalid')).toBeNull();
     });
 
     it('associates error message with aria-errormessage', async () => {
-        const [input, host, user] = await initInputBase('<email-box label="Email" required></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email" required></email-box>');
 
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.error).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
 
-        await user.type(input, 'invalid');
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, 'invalid');
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        const error = host.querySelector('[data-role="error-message"]');
+        const error = fixture.error;
 
-        expect(error.id).toBe(host.errorId);
-        expect(input.getAttribute('aria-errormessage')).toBe(host.errorId);
+        expect(error.id).toBe(fixture.host.errorId);
+        expect(fixture.input.getAttribute('aria-errormessage')).toBe(fixture.host.errorId);
         expect(error.getAttribute('aria-live')).toBe('assertive');
     });
 
     it('removes aria-errormessage again when the input becomes valid', async () => {
-        const [input, host, user] = await initInputBase('<email-box label="Email" required></email-box>');
+        const fixture = await initTestFixture('<email-box label="Email" required></email-box>');
 
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
 
-        await user.type(input, 'invalid');
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, 'invalid');
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        expect(input.getAttribute('aria-errormessage')).toBe(host.errorId);
-        expect(host.querySelector('[data-role="error-message"]')).not.toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBe(fixture.host.errorId);
+        expect(fixture.error).not.toBeNull();
 
-        input.focus();
-        await user.type(input, 'valid@example.com');
-        await user.tab();
-        await host.updateComplete;
+        fixture.input.focus();
+        await fixture.user.type(fixture.input, 'valid@example.com');
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.error).toBeNull();
     });
 });

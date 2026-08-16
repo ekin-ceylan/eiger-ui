@@ -7,6 +7,7 @@ async function initPagination(props = {}) {
     Object.assign(host, props);
     document.body.appendChild(host);
     await host.updateComplete;
+
     return host;
 }
 

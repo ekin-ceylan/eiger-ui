@@ -3,53 +3,46 @@ import PlateBox from '../../components/text-input/plate-box.js';
 defineElement('plate-box', PlateBox);
 
 describe('Masking tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     /* <plate-box field-id="plate-no" label="Plaka Numarası" value="55  ty" required></plate-box> */
 
     beforeEach(async () => {
         const el = '<plate-box field-id="plate-no" label="Plaka Numarası"></plate-box>';
-        [input, , user] = await initInputBase(el);
+        fixture = await initTestFixture(el);
     });
 
-    it('formats while typing full plate', async () => {
-        await user.type(input, '34ABC123');
-
-        expect(input.value).toBe('34 ABC 123');
-    });
-
-    it('handles backspace', async () => {
-        await user.type(input, '34ABC1');
-        await user.keyboard('{Backspace}');
-
-        expect(input.value).toBe('34 ABC');
+    it.each([
+        ['formats while typing full plate', 'type', '34ABC123', '34 ABC 123'],
+        ['uppercases while typing', 'type', '34abc123', '34 ABC 123'],
+    ])('%s', async (_description, action, value, expected) => {
+        await fixture.user[action](fixture.input, value);
+        expect(fixture.input.value).toBe(expected);
     });
 
     it('paste formats', async () => {
-        await user.paste('06BC4567');
+        await fixture.user.paste('06BC4567');
+        expect(fixture.input.value).toBe('06 BC 4567');
+    });
 
-        expect(input.value).toBe('06 BC 4567');
+    it('handles backspace', async () => {
+        await fixture.user.type(fixture.input, '34ABC1');
+        await fixture.user.keyboard('{Backspace}');
+
+        expect(fixture.input.value).toBe('34 ABC');
     });
 
     it('rejects invalid char on typing', async () => {
-        await user.type(input, '34A@BC123'); // @ is invalid
+        await fixture.user.type(fixture.input, '34A@BC123'); // @ is invalid
 
-        expect(input.value).toBe('34 ABC 123');
+        expect(fixture.input.value).toBe('34 ABC 123');
     });
 
-    it('rejects invalid char on typing', async () => {
-        await user.type(input, 'gh'); // starting with char invalid
+    it('rejects invalid starting characters on typing', async () => {
+        await fixture.user.type(fixture.input, 'gh'); // starting with char invalid
 
-        expect(input.value).toBe(''); // should remain empty
-    });
-
-    it('uppercases on typing', async () => {
-        await user.type(input, '34abc123');
-
-        expect(input.value).toBe('34 ABC 123');
+        expect(fixture.input.value).toBe(''); // should remain empty
     });
 
     // Geri silme (backspace) ile maskenin doğru güncellenmesi
@@ -60,56 +53,49 @@ describe('Masking tests', () => {
 });
 
 describe('Validating tests', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {PlateBox} */
-    let host;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
-
-    const getErrorElement = () => host.querySelector('[data-role="error-message"]');
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
         const el = '<plate-box field-id="plate-no" label="Plaka Numarası" required></plate-box>';
-        [input, host, user] = await initInputBase(el);
+        fixture = await initTestFixture(el);
     });
 
     it('does not show required error before first input interaction', async () => {
-        await user.tab(); // focus'tan çık
+        await fixture.user.tab(); // focus'tan çık
 
-        expect(input.validity.valueMissing).toBe(true);
-        expect(getErrorElement()).toBeNull();
-        expect(host.invalid).toBe(false);
+        expect(fixture.input.validity.valueMissing).toBe(true);
+        expect(fixture.error).toBeNull();
+        expect(fixture.host.invalid).toBe(false);
     });
 
     it('enforces maxlength', async () => {
-        await user.type(input, '34ABC12345'); // uzun input
-        await user.tab(); // focus'tan çık
+        await fixture.user.type(fixture.input, '34ABC12345'); // uzun input
+        await fixture.user.tab(); // focus'tan çık
 
         // native davranış: maxlength aşılamaz (fazla karakterler yazılamaz)
-        expect(input.value.length).toBeLessThanOrEqual(input.maxLength);
+        expect(fixture.input.value.length).toBeLessThanOrEqual(fixture.input.maxLength);
     });
 
     it('enforces minlength', async () => {
-        await user.type(input, '34A'); // 3 chars, min is 9
-        await user.tab(); // focus'tan çık
+        await fixture.user.type(fixture.input, '34A'); // 3 chars, min is 9
+        await fixture.user.tab(); // focus'tan çık
 
-        expect(input.value).toBe('34 A');
-        expect(input.validity.valid).toBe(false);
+        expect(fixture.input.value).toBe('34 A');
+        expect(fixture.input.validity.valid).toBe(false);
     });
 
     it('adds aria-errormessage after first input interaction and invalid state', async () => {
-        expect(host.querySelector('[data-role="error-message"]')).toBeNull();
-        expect(input.getAttribute('aria-errormessage')).toBeNull();
+        expect(fixture.error).toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBeNull();
 
-        await user.type(input, '3');
-        await user.clear(input);
-        await user.tab();
-        await host.updateComplete;
+        await fixture.user.type(fixture.input, '3');
+        await fixture.user.clear(fixture.input);
+        await fixture.user.tab();
+        await fixture.host.updateComplete;
 
-        let errorElement = host.querySelector('[data-role="error-message"]');
-        expect(errorElement).not.toBeNull();
-        expect(input.getAttribute('aria-errormessage')).toBe(host.errorId);
+        expect(fixture.error).not.toBeNull();
+        expect(fixture.input.getAttribute('aria-errormessage')).toBe(fixture.host.errorId);
     });
 
     // Minimum karakter sayısı kontrolü ve hata mesajı

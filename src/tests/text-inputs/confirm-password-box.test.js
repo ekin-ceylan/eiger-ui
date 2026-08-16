@@ -7,13 +7,11 @@ defineElement('confirm-password-box', ConfirmPasswordBox);
 const getErrorElement = host => host.querySelector('[data-role="error-message"]');
 
 describe('ConfirmPasswordBox: Initial State', () => {
-    /** @type {HTMLInputElement} */
-    let input;
-    /** @type {ConfirmPasswordBox} */
-    let host;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        [input, host] = await initInputBase('<confirm-password-box label="Şifreyi Doğrula"></confirm-password-box>');
+        fixture = await initTestFixture('<confirm-password-box label="Şifreyi Doğrula"></confirm-password-box>');
     });
 
     afterEach(() => {
@@ -21,51 +19,39 @@ describe('ConfirmPasswordBox: Initial State', () => {
     });
 
     it('autocomplete should be new-password', () => {
-        expect(input.autocomplete).toBe('new-password');
+        expect(fixture.input.autocomplete).toBe('new-password');
     });
 
     it('input type should be password by default', () => {
-        expect(input.type).toBe('password');
+        expect(fixture.input.type).toBe('password');
     });
 
     it('matchSelector should be undefined by default', () => {
-        expect(host.matchSelector).toBeUndefined();
+        expect(fixture.host.matchSelector).toBeUndefined();
     });
 
     it('inherits toggle visibility from PasswordBox', () => {
-        const toggleButton = host.querySelector('[data-role="toggle-visibility"]');
+        const toggleButton = fixture.querySelector('[data-role="toggle-visibility"]');
         expect(toggleButton).not.toBeNull();
     });
 });
 
 describe('ConfirmPasswordBox: Matching Validation', () => {
     /** @type {HTMLInputElement} */
-    let passwordInput;
-    /** @type {HTMLInputElement} */
     let confirmInput;
     /** @type {ConfirmPasswordBox} */
     let confirmHost;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = `
-            <password-box label="Şifre" id="password"></password-box>
-            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='password']"></confirm-password-box>
-        `;
+        fixture = await initTestFixture(`<password-box label="Şifre" id="password"></password-box>
+            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='password']"></confirm-password-box>`);
 
-        const passwordHost = document.body.querySelector('password-box');
         confirmHost = document.body.querySelector('confirm-password-box');
-
-        await passwordHost.updateComplete;
-        await confirmHost.updateComplete;
-
-        passwordInput = passwordHost.inputElement;
         confirmInput = confirmHost.inputElement;
 
-        user = (await import('@testing-library/user-event')).default.setup();
-        passwordInput.focus();
+        fixture.input.focus();
     });
 
     afterEach(() => {
@@ -73,20 +59,20 @@ describe('ConfirmPasswordBox: Matching Validation', () => {
     });
 
     it('is valid when passwords match', async () => {
-        await user.type(passwordInput, 'MyPassword123');
+        await fixture.user.type(fixture.input, 'MyPassword123');
         confirmInput.focus();
-        await user.type(confirmInput, 'MyPassword123');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'MyPassword123');
+        await fixture.user.tab();
 
         expect(getErrorElement(confirmHost)).toBeNull();
         expect(confirmHost.invalid).toBe(false);
     });
 
     it('shows mismatch error when passwords do not match', async () => {
-        await user.type(passwordInput, 'MyPassword123');
+        await fixture.user.type(fixture.input, 'MyPassword123');
         confirmInput.focus();
-        await user.type(confirmInput, 'DifferentPass');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'DifferentPass');
+        await fixture.user.tab();
 
         const errorElement = getErrorElement(confirmHost);
         expect(errorElement).not.toBeNull();
@@ -94,17 +80,17 @@ describe('ConfirmPasswordBox: Matching Validation', () => {
         expect(errorElement.textContent).toContain('eşleşmiyor');
     });
 
-    it.skip('becomes valid when corrected after mismatch', async () => {
-        await user.type(passwordInput, 'MyPassword123');
+    it('becomes valid when corrected after mismatch', async () => {
+        await fixture.user.type(fixture.input, 'MyPassword123');
         confirmInput.focus();
-        await user.type(confirmInput, 'Wrong');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'Wrong');
+        await fixture.user.tab();
 
         expect(confirmHost.invalid).toBe(true);
 
         // Clear and correct the confirm password
-        await user.clear(confirmInput);
-        await user.type(confirmInput, 'MyPassword123');
+        await fixture.user.clear(confirmInput);
+        await fixture.user.type(confirmInput, 'MyPassword123');
         await confirmHost.updateComplete;
 
         expect(getErrorElement(confirmHost)).toBeNull();
@@ -113,10 +99,10 @@ describe('ConfirmPasswordBox: Matching Validation', () => {
 
     it.skip('ignores match validation when selector target is not found', async () => {
         // Fill password and confirm with different values
-        await user.type(passwordInput, 'MyPassword123');
+        await fixture.user.type(fixture.input, 'MyPassword123');
         confirmInput.focus();
-        await user.type(confirmInput, 'DifferentPass');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'DifferentPass');
+        await fixture.user.tab();
 
         // Should be invalid due to mismatch
         expect(confirmHost.invalid).toBe(true);
@@ -135,31 +121,20 @@ describe('ConfirmPasswordBox: Matching Validation', () => {
 
 describe('ConfirmPasswordBox: Dynamic Selector Update', () => {
     /** @type {HTMLInputElement} */
-    let passwordInput;
-    /** @type {HTMLInputElement} */
     let confirmInput;
     /** @type {ConfirmPasswordBox} */
     let confirmHost;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = `
-            <password-box label="Şifre" id="original"></password-box>
-            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='original']"></confirm-password-box>
-        `;
+        fixture = await initTestFixture(`<password-box label="Şifre" id="original"></password-box>
+            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='original']"></confirm-password-box>`);
 
-        const passwordHost = document.body.querySelector('password-box');
         confirmHost = document.body.querySelector('confirm-password-box');
-
-        await passwordHost.updateComplete;
-        await confirmHost.updateComplete;
-
-        passwordInput = passwordHost.inputElement;
         confirmInput = confirmHost.inputElement;
 
-        user = (await import('@testing-library/user-event')).default.setup();
+        fixture.input.focus();
     });
 
     afterEach(() => {
@@ -167,10 +142,10 @@ describe('ConfirmPasswordBox: Dynamic Selector Update', () => {
     });
 
     it.skip('updates target when match-selector attribute changes', async () => {
-        await user.type(passwordInput, 'Pass123');
+        await fixture.user.type(fixture.input, 'Pass123');
         confirmInput.focus();
-        await user.type(confirmInput, 'Pass123');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'Pass123');
+        await fixture.user.tab();
 
         expect(confirmHost.invalid).toBe(false);
 
@@ -184,34 +159,32 @@ describe('ConfirmPasswordBox: Dynamic Selector Update', () => {
 });
 
 describe('ConfirmPasswordBox: Message Localization', () => {
-    /** @type {ConfirmPasswordBox} */
-    let host;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     afterEach(() => {
         document.body.innerHTML = '';
     });
 
     it('uses passwordMismatch message from localeMessages', async () => {
-        [, host] = await initInputBase('<confirm-password-box label="Şifreyi Doğrula"></confirm-password-box>', 'tr');
+        fixture = await initTestFixture('<confirm-password-box label="Şifreyi Doğrula"></confirm-password-box>', 'tr');
 
-        expect(host.passwordMismatchMessage).toContain('Şifreyi Doğrula');
+        expect(fixture.host.passwordMismatchMessage).toContain('Şifreyi Doğrula');
     });
 
     it('passwordMismatchMessage includes label', async () => {
-        [, host] = await initInputBase('<confirm-password-box label="Confirm Password"></confirm-password-box>', 'en');
+        fixture = await initTestFixture('<confirm-password-box label="Confirm Password"></confirm-password-box>', 'en');
 
-        expect(host.passwordMismatchMessage).toContain('Confirm Password');
+        expect(fixture.host.passwordMismatchMessage).toContain('Confirm Password');
     });
 });
 
 describe('ConfirmPasswordBox: Accessibility', () => {
-    /** @type {ConfirmPasswordBox} */
-    let host;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     beforeEach(async () => {
-        [, host, user] = await initInputBase('<confirm-password-box label="Şifreyi Doğrula"></confirm-password-box>');
+        fixture = await initTestFixture('<confirm-password-box label="Şifreyi Doğrula"></confirm-password-box>');
     });
 
     afterEach(() => {
@@ -219,64 +192,48 @@ describe('ConfirmPasswordBox: Accessibility', () => {
     });
 
     it('toggle button should be accessible and functional', async () => {
-        const toggleButton = host.querySelector('[data-role="toggle-visibility"]');
+        const toggleButton = fixture.querySelector('[data-role="toggle-visibility"]');
+
         expect(toggleButton).not.toBeNull();
         expect(toggleButton.getAttribute('aria-label')).toBeDefined();
     });
 
     it('inherits aria attributes from parent input', async () => {
-        const input = host.inputElement;
-        expect(input.getAttribute('aria-invalid')).toBeDefined();
+        expect(fixture.input.getAttribute('aria-invalid')).toBeDefined();
     });
 });
 
 describe('ConfirmPasswordBox: Edge Cases & Coverage', () => {
-    /** @type {HTMLInputElement} */
-    let confirmInput;
-    /** @type {ConfirmPasswordBox} */
-    let confirmHost;
-    /** @type {import('@testing-library/user-event').UserEvent} */
-    let user;
+    /** @type {import('../types').TestFixture<HTMLInputElement>} */
+    let fixture;
 
     afterEach(() => {
         document.body.innerHTML = '';
     });
 
     it('handles null matchTarget gracefully', async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = '<confirm-password-box label="Şifreyi Doğrula" match-selector="[id=\'nonexistent\']"></confirm-password-box>';
+        fixture = await initTestFixture('<confirm-password-box label="Şifreyi Doğrula" match-selector="[id=\'nonexistent\']"></confirm-password-box>');
 
-        confirmHost = document.body.querySelector('confirm-password-box');
-        await confirmHost.updateComplete;
-
-        confirmInput = confirmHost.inputElement;
-        user = (await import('@testing-library/user-event')).default.setup();
-
-        await user.type(confirmInput, 'SomeValue');
-        await user.tab();
+        await fixture.user.type(fixture.input, 'SomeValue');
+        await fixture.user.tab();
 
         // Should be valid since no match target exists to compare
-        expect(confirmHost.invalid).toBe(false);
+        expect(fixture.host.invalid).toBe(false);
     });
 
     it('skips validation when confirm input is empty (isEmpty check)', async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = `
-            <password-box label="Şifre" id="password"></password-box>
-            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='password']"></confirm-password-box>
-        `;
+        const innerHtml = `<password-box label="Şifre" id="password"></password-box>
+            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='password']"></confirm-password-box>`;
 
-        const passwordHost = document.body.querySelector('password-box');
-        confirmHost = document.body.querySelector('confirm-password-box');
+        fixture = await initTestFixture(innerHtml);
 
-        await passwordHost.updateComplete;
-        await confirmHost.updateComplete;
+        const passwordHost = fixture.host;
+        const confirmHost = document.body.querySelector('confirm-password-box');
 
-        const passwordInput = passwordHost.inputElement;
-        confirmInput = confirmHost.inputElement;
-        user = (await import('@testing-library/user-event')).default.setup();
+        const passwordInput = fixture.input;
+        const confirmInput = confirmHost.inputElement;
 
-        await user.type(passwordInput, 'MyPassword123');
+        await fixture.user.type(passwordInput, 'MyPassword123');
 
         // Don't fill confirm input, trigger validation on match target
         passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -286,20 +243,16 @@ describe('ConfirmPasswordBox: Edge Cases & Coverage', () => {
     });
 
     it('validates only after interaction (interacted property)', async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = `
-            <password-box label="Şifre" id="password"></password-box>
-            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='password']"></confirm-password-box>
-        `;
+        const innerHtml = `<password-box label="Şifre" id="password"></password-box>
+            <confirm-password-box label="Şifreyi Doğrula" match-selector="[id='password']"></confirm-password-box>`;
 
-        const passwordHost = document.body.querySelector('password-box');
-        confirmHost = document.body.querySelector('confirm-password-box');
+        fixture = await initTestFixture(innerHtml);
 
-        await passwordHost.updateComplete;
-        await confirmHost.updateComplete;
+        const passwordHost = fixture.host;
+        const confirmHost = document.body.querySelector('confirm-password-box');
 
-        const passwordInput = passwordHost.inputElement;
-        confirmInput = confirmHost.inputElement;
+        const passwordInput = fixture.input;
+        const confirmInput = confirmHost.inputElement;
 
         // Set values programmatically (no user interaction)
         passwordInput.value = 'MyPassword123';
@@ -314,36 +267,30 @@ describe('ConfirmPasswordBox: Edge Cases & Coverage', () => {
     });
 
     it('properly removes old listener when selector changes', async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = `
-            <password-box label="First" id="first"></password-box>
+        const innerHtml = `<password-box label="First" id="first"></password-box>
             <password-box label="Second" id="second"></password-box>
-            <confirm-password-box label="Confirm" match-selector="[id='first']"></confirm-password-box>
-        `;
+            <confirm-password-box label="Confirm" match-selector="[id='first']"></confirm-password-box>`;
 
-        const firstHost = document.body.querySelector('#first');
+        fixture = await initTestFixture(innerHtml);
+
+        const firstHost = fixture.host;
         const secondHost = document.body.querySelector('#second');
-        confirmHost = document.body.querySelector('confirm-password-box');
+        const confirmHost = document.body.querySelector('confirm-password-box');
 
-        await firstHost.updateComplete;
-        await secondHost.updateComplete;
-        await confirmHost.updateComplete;
-
-        const firstInput = firstHost.inputElement;
+        const firstInput = fixture.input;
         const secondInput = secondHost.inputElement;
-        confirmInput = confirmHost.inputElement;
-        user = (await import('@testing-library/user-event')).default.setup();
+        const confirmInput = confirmHost.inputElement;
 
         // Fill all matching first
-        await user.type(firstInput, 'Test123');
+        await fixture.user.type(firstInput, 'Test123');
         confirmInput.focus();
-        await user.type(confirmInput, 'Test123');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'Test123');
+        await fixture.user.tab();
 
         expect(confirmHost.invalid).toBe(false);
 
         // Fill second to match confirm
-        await user.type(secondInput, 'Test123');
+        await fixture.user.type(secondInput, 'Test123');
 
         // Change selector to second (now matches)
         confirmHost.setAttribute('match-selector', '#second');
@@ -353,39 +300,33 @@ describe('ConfirmPasswordBox: Edge Cases & Coverage', () => {
         expect(confirmHost.invalid).toBe(false);
 
         // Change first input - confirm should stay valid (listener removed from first)
-        await user.clear(firstInput);
-        await user.type(firstInput, 'Changed');
+        await fixture.user.clear(firstInput);
+        await fixture.user.type(firstInput, 'Changed');
 
         // Confirm still valid because listener is on second, not first
         expect(confirmHost.invalid).toBe(false);
 
         // Change second input - confirm should revalidate (listener on second)
-        await user.clear(secondInput);
-        await user.type(secondInput, 'Other');
+        await fixture.user.clear(secondInput);
+        await fixture.user.type(secondInput, 'Other');
 
         // Now confirm should be invalid (mismatch with second input)
         expect(confirmHost.invalid).toBe(true);
     });
 
     it('calls checkValidity() immediately when selector exists and interacted', async () => {
-        document.body.setAttribute('lang', 'tr');
-        document.body.innerHTML = `
-            <password-box label="Şifre" id="password"></password-box>
-            <confirm-password-box label="Confirm" match-selector="[id='nonexistent']"></confirm-password-box>
-        `;
+        const innerHtml = `<password-box label="Şifre" id="password"></password-box>
+            <confirm-password-box label="Confirm" match-selector="[id='nonexistent']"></confirm-password-box>`;
 
-        const passwordHost = document.body.querySelector('password-box');
-        confirmHost = document.body.querySelector('confirm-password-box');
+        fixture = await initTestFixture(innerHtml);
 
-        await passwordHost.updateComplete;
-        await confirmHost.updateComplete;
-
-        confirmInput = confirmHost.inputElement;
-        user = (await import('@testing-library/user-event')).default.setup();
+        const passwordHost = fixture.host;
+        const confirmHost = document.body.querySelector('confirm-password-box');
+        const confirmInput = confirmHost.inputElement;
 
         // Interact with confirm input first (marks as interacted)
-        await user.type(confirmInput, 'Test');
-        await user.tab();
+        await fixture.user.type(confirmInput, 'Test');
+        await fixture.user.tab();
 
         // Now change selector to valid target - should immediately validate
         confirmHost.setAttribute('match-selector', "[id='password']");

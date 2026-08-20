@@ -319,12 +319,13 @@ describe('Reset Tests', () => {
     });
 
     it('component.reset() sets value to the value attribute even if value has not changed', async () => {
+        /** @type {import('../types').TestFixture<HTMLInputElement>} */
         const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
 
         await fixture.host.reset();
 
         expect(fixture.host.value).toBe('initial');
-        expect(fixture.host.inputElement.value).toBe('initial');
+        expect(fixture.input.value).toBe('initial');
     });
 
     it('component.reset() sets value to the value attribute after value changed', async () => {
@@ -380,11 +381,11 @@ describe('Reset Tests', () => {
     });
 
     it('form reset sets value to the value attribute when value has not changed', async () => {
+        /** @type {import('../types').TestFixture<HTMLInputElement>} */
         const fixture = await initTestFixture('<text-box label="Name" value="initial"></text-box>');
 
         fixture.reset.click();
         await new Promise(resolve => requestAnimationFrame(resolve));
-        await fixture.host.updateComplete;
 
         expect(fixture.host.value).toBe('initial');
         expect(fixture.input.value).toBe('initial');

@@ -33,6 +33,10 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
     #slotContent = '';
     #cachedInput = undefined;
 
+    get resetValue() {
+        return this.getAttribute('value') || this.#slotContent || '';
+    }
+
     /**
      * Returns the reference to the native input element within the component. Caches the reference after the first query for performance optimization.
      * @returns {HTMLTextAreaElement | null}
@@ -127,8 +131,6 @@ export default class TextArea extends mixins(StandardControlBase, SlotCollectorM
         if (hasProjectedContent && isEmpty(this.value)) {
             this.value = this.#slotContent;
         }
-
-        this.#slotContent = '';
     }
 
     /** @override @protected */

@@ -196,13 +196,31 @@ describe('Reset tests', () => {
         document.body.innerHTML = '';
     });
 
-    it('component.reset() sets value to value attribute and syncs textarea', async () => {
-        const fixture = await initTestFixture('<text-area label="Desc" value="initial"></text-area>');
+    it.each([
+        ['value attribute', 'component', false, '<text-area label="Desc" value="initial"></text-area>'],
+        ['value attribute', 'form', false, '<text-area label="Desc" value="initial"></text-area>'],
+        ['slot', 'component', false, '<text-area label="Desc">initial</text-area>'],
+        ['slot', 'form', false, '<text-area label="Desc">initial</text-area>'],
+        ['value attribute', 'component', true, '<text-area label="Desc" value="initial"></text-area>'],
+        ['value attribute', 'form', true, '<text-area label="Desc" value="initial"></text-area>'],
+        ['slot', 'component', true, '<text-area label="Desc">initial</text-area>'],
+        ['slot', 'form', true, '<text-area label="Desc">initial</text-area>'],
+    ])('when initial value is %s and %s reset is used, it resets the value', async (_source, resetType, changed, markup) => {
+        /** @type {import('../types').TestFixture<HTMLInputElement>} */
+        const fixture = await initTestFixture(markup);
 
-        fixture.host.value = 'changed';
-        await fixture.host.updateComplete;
-        await fixture.host.reset();
-        await fixture.host.updateComplete;
+        if (changed) {
+            fixture.host.value = 'changed';
+            await fixture.host.updateComplete;
+        }
+
+        if (resetType === 'component') {
+            await fixture.host.reset();
+            await fixture.host.updateComplete;
+        } else {
+            await fixture.reset.click();
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
 
         expect(fixture.host.value).toBe('initial');
         expect(fixture.input.value).toBe('initial');
@@ -363,9 +381,9 @@ DESCRIPTION
 9. has correct description id format with componentName and uniqueId
 
 RESET
-1. component.reset() sets value to value attribute
-2. component.reset() syncs inner textarea value to value attribute
-3. component.reset() clears invalid state and error message
-4. component.reset() resets interacted to false
-5. form reset mirrors the same behavior as component.reset()
+1. component.reset() restores the initial value from the value attribute
+2. form reset restores the initial value from the value attribute
+3. component.reset() restores the initial value from default slotted text
+4. form reset restores the initial value from default slotted text
+5. component and form reset restore the initial value both before and after the value changes
 */

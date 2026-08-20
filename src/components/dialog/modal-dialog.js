@@ -57,7 +57,8 @@ export default class ModalDialog extends lightMixins(SlotCollectorMixin) {
     }
 
     /** @override @protected */
-    firstUpdated() {
+    firstUpdated(changed) {
+        super.firstUpdated(changed);
         this.#dialog = this.renderRoot.querySelector('dialog');
 
         this.#dialog?.addEventListener('cancel', e => {

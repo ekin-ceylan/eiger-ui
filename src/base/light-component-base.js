@@ -44,6 +44,12 @@ export default class LightComponentBase extends LitElement {
         return getMessages(this.lang);
     }
 
+    /** @override @protected */
+    firstUpdated(changedProperties) {
+        super.firstUpdated(changedProperties);
+        this.dispatchCustomEvent('load');
+    }
+
     /**
      * @override
      * Initializes component lifecycle, locale, and event listeners.

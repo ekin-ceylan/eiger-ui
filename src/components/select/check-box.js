@@ -55,7 +55,8 @@ export default class CheckBox extends mixins(InputBase, SlotCollectorMixin) {
         }
     }
 
-    firstUpdated() {
+    firstUpdated(changed) {
+        super.firstUpdated(changed);
         this.inputElement = this.renderRoot.querySelector('input');
         this.#syncIndeterminate();
     }

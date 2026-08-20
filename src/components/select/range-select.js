@@ -56,7 +56,8 @@ export default class RangeSelect extends InputBase {
         `;
     }
 
-    firstUpdated() {
+    firstUpdated(changed) {
+        super.firstUpdated(changed);
         this.inputElement = this.renderRoot.querySelector('input');
     }
 

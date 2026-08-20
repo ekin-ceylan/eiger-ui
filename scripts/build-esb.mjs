@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { minifyHTMLLiteralsPlugin } from 'esbuild-plugin-minify-html-literals';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
-const name = 'Custom Web Components Lib with Lit.js'; // pkg.name;
+const name = `${pkg.name} | Custom Web Components Lib with Lit.js`; // pkg.name;
 const author = pkg.repository?.url; //pkg.author;
 
 const bannerText = `/*!

@@ -1,27 +1,27 @@
 {
-    "name": "typed-ui",
-    "version": "0.9.14",
-    "title": "Typed UI",
-    "description": "Typed UI: Field/data-type specific, accessible, extensible Web Components.",
+    "name": "eiger-ui",
+    "version": "0.9.15",
+    "title": "Eiger UI",
+    "description": "Eiger UI: Field/data-type specific, accessible, extensible Web Components.",
     "author": "Ekin Ceylan <ekinceylan@gmail.com> (https://github.com/ekin-ceylan)",
     "license": "MIT",
     "type": "module",
-    "main": "dist/typed-ui.js",
-    "module": "dist/typed-ui.js",
+    "main": "dist/eiger-ui.js",
+    "module": "dist/eiger-ui.js",
     "exports": {
         ".": {
-            "import": "./dist/typed-ui.js",
-            "types": "./dist/typed-ui.d.ts"
+            "import": "./dist/eiger-ui.js",
+            "types": "./dist/eiger-ui.d.ts"
         },
         "./with-lit": {
-            "import": "./dist/typed-ui-with-lit.js",
-            "types": "./dist/typed-ui.d.ts"
+            "import": "./dist/eiger-ui-with-lit.js",
+            "types": "./dist/eiger-ui.d.ts"
         },
         "./iife": {
-            "import": "./dist/typed-ui.iife.js"
+            "import": "./dist/eiger-ui.iife.js"
         }
     },
-    "types": "dist/typed-ui.d.ts",
+    "types": "dist/eiger-ui.d.ts",
     "files": [
         "dist",
         "README.md",
@@ -29,7 +29,7 @@
     ],
     "sideEffects": false,
     "keywords": [
-        "typed-ui",
+        "eiger-ui",
         "web-components",
         "custom-elements",
         "form",
@@ -41,12 +41,12 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/ekin-ceylan/typed-ui.git"
+        "url": "https://github.com/ekin-ceylan/eiger-ui.git"
     },
     "bugs": {
-        "url": "https://github.com/ekin-ceylan/typed-ui/issues"
+        "url": "https://github.com/ekin-ceylan/eiger-ui/issues"
     },
-    "homepage": "https://github.com/ekin-ceylan/typed-ui#readme",
+    "homepage": "https://github.com/ekin-ceylan/eiger-ui#readme",
     "scripts": {
         "dev": "vite",
         "build": "rimraf dist/* --glob && npm run build:bundle && npm run build:types",

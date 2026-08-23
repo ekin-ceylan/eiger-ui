@@ -22,4 +22,6 @@ export const enMessages = {
     hidePasswordAriaLabel: 'Hide password',
     clearButtonAriaLabel: 'Clear value',
     noOptionsLabel: 'No Records Found',
+    undoButtonTitle: 'Undo',
+    redoButtonTitle: 'Redo',
 };

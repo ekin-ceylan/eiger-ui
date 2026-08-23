@@ -22,4 +22,6 @@ export const trMessages = {
     hidePasswordAriaLabel: 'Şifreyi gizle',
     clearButtonAriaLabel: 'Değeri temizle',
     noOptionsLabel: 'Kayıt Bulunamadı',
+    undoButtonTitle: 'Geri al',
+    redoButtonTitle: 'İleri al',
 };

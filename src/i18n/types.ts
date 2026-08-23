@@ -107,6 +107,18 @@ export interface LocaleMessages {
      */
     noOptionsLabel: string;
 
+    /**
+     * Title for the undo button in rich text editor components.
+     * Example: "Undo"
+     */
+    undoButtonTitle: string;
+
+    /**
+     * Title for the redo button in rich text editor components.
+     * Example: "Redo"
+     */
+    redoButtonTitle: string;
+
     // #endregion SIMPLE STRINGS
 
     // #region COMPLEX MESSAGES WITH SPECIAL LOGIC

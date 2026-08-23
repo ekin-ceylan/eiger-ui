@@ -40,6 +40,7 @@ export { default as NewPasswordBox } from './components/text-input/new-password-
 export { default as IntegerBox } from './components/text-input/integer-box.js';
 
 export { default as TextArea } from './components/text-area/text-area.js';
+export { default as RichTextEditor } from './components/text-area/rich-text-editor.js';
 
 // Select
 export { default as SelectBox } from './components/select/select-box.js';

@@ -32,7 +32,7 @@ const esmOptions = {
     sourcemap: false,
 
     plugins: [minifyHTMLLiteralsPlugin()],
-    external: ['lit', 'lit/*'],
+    external: ['lit', 'lit/*', '@tiptap', '@tiptap/*'],
     banner: {
         js: bannerText,
     },
@@ -44,13 +44,13 @@ const esmOptions = {
 const esmWithLit = {
     ...esmOptions,
     entryNames: 'typed-ui-with-lit', // klasör yapısını korur
-    external: [],
+    external: ['@tiptap', '@tiptap/*'],
 };
 
 const iifeOptions = {
     ...esmOptions,
     entryNames: 'typed-ui.iife',
-    external: [],
+    external: ['@tiptap', '@tiptap/*'],
     format: 'iife',
     globalName: 'TypedUI',
 };

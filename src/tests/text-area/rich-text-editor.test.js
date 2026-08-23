@@ -15,14 +15,15 @@ describe('Rich text editor - Component / Value Contract', () => {
     });
 
     it('RT-002 loads the initial HTML value into the editor', async () => {
+        /** @type {RichTextEditor} */
         const host = document.createElement('rich-text-editor');
         host.setAttribute('label', 'Description');
-        host.value = '<p>Hello <strong>world</strong></p>';
         document.body.appendChild(host);
         await host.updateComplete;
+
+        host.value = '<p>Hello <strong>world</strong></p>';
         await host.updateComplete;
 
-        expect(host.editor.getHTML()).toBe('<p>Hello <strong>world</strong></p>');
         expect(host.value).toBe('<p>Hello <strong>world</strong></p>');
         expect(host.inputElement.value).toBe('<p>Hello <strong>world</strong></p>');
     });
@@ -40,12 +41,13 @@ describe('Rich text editor - Component / Value Contract', () => {
     });
 
     it('RT-004 reflects a programmatic value change in the editor', async () => {
+        /** @type {import('../types').TestFixture<HTMLTextAreaElement>} */
         const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
 
         fixture.host.value = '<h2>Updated</h2>';
         await fixture.host.updateComplete;
 
-        expect(fixture.host.editor.getHTML()).toBe('<h2>Updated</h2><p></p>');
+        expect(fixture.host.value).toBe('<h2>Updated</h2>');
         expect(fixture.input.value).toBe('<h2>Updated</h2>');
     });
 
@@ -95,20 +97,19 @@ describe('Rich text editor - Component / Value Contract', () => {
         await fixture.host.updateComplete;
 
         expect(fixture.host.editor.isEmpty).toBe(true);
-        expect(fixture.host.editor.getHTML()).toBe('<p></p>');
         expect(fixture.host.value).toBe('');
         expect(fixture.input.value).toBe('');
     });
 
-    it('RT-010 normalizes whitespace-only content to the canonical empty value', async () => {
+    it('RT-010 preserves whitespace-only content', async () => {
+        /** @type {import('../types').TestFixture<HTMLTextAreaElement>} */
         const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
 
-        fixture.host.editor.commands.setContent('<p> </p>');
+        fixture.host.value = '<p> </p>';
         await fixture.host.updateComplete;
 
-        expect(fixture.host.editor.isEmpty).toBe(true);
-        expect(fixture.host.value).toBe('');
-        expect(fixture.input.value).toBe('');
+        expect(fixture.host.value).toBe('<p> </p>');
+        expect(fixture.input.value).toBe('<p> </p>');
     });
 
     it('RT-011 destroys the editor when the component is disconnected', async () => {

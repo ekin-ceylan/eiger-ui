@@ -33,4 +33,21 @@ function formatEditorContent(editorContent) {
     return formatted.trim();
 }
 
-export { extensions, formatEditorContent };
+/**
+ * Tiptap'ın belgenin sonuna yapısal olarak eklediği boş <p></p> etiketini siler.
+ * Kullanıcının bilerek bıraktığı boşluklara (nbsp, br) dokunmaz.
+ * @param {string} html
+ * @returns {string}
+ */
+function trimTrailingP(html) {
+    if (!html || html === '<p></p>') return '';
+
+    // Tiptap'ın getHTML() çıktısında otomatik eklenen P her zaman tam olarak böyledir
+    if (html.endsWith('<p></p>')) {
+        return html.slice(0, -7); // En sondaki 7 karakteri (<p></p>) kesip atar
+    }
+
+    return html;
+}
+
+export { extensions, formatEditorContent, trimTrailingP };

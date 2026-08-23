@@ -1,16 +1,13 @@
 import { html } from 'lit';
 import { Editor } from '@tiptap/core';
-import { extensions, formatEditorContent } from '../../modules/rich-text-helpers/rich-text-helper.js';
-import RichTextImageForm from './rich-text-image-form.js';
-import RichTextLinkForm from './rich-text-link-form.js';
+import { defineComponent, ifDefined, isEmpty } from '../../modules/utilities.js';
+import { extensions, formatEditorContent, trimTrailingP } from '../../modules/rich-text-helpers/rich-text-helper.js';
 import RichTextImage from '../../models/RichTextImage.js';
 import RichTextEditorLink from '../../models/RichTextEditorLink.js';
-import { defineComponent, ifDefined, isEmpty } from '../../modules/utilities.js';
-import { Placeholder } from '@tiptap/extensions';
+// import { Placeholder } from '@tiptap/extensions';
 import StandardControlBase from '../../base/standard-control-base.js';
 import { spread } from '../../modules/spread.js';
-
-/** @typedef {1 | 2 | 3 | 4 | 5 | 6} HeadingLevel */
+import { RichTextImageForm, RichTextLinkForm } from './rich-text-popover-forms.js';
 
 export default class RichTextEditor extends StandardControlBase {
     #cachedInput = undefined;
@@ -47,7 +44,7 @@ export default class RichTextEditor extends StandardControlBase {
 
     /**
      * Returns the reference to the native input element within the component. Caches the reference after the first query for performance optimization.
-     * @returns {HTMLInputElement | null}
+     * @returns {HTMLTextAreaElement | null}
      */
     get inputElement() {
         if (this.#cachedInput === undefined) {
@@ -106,29 +103,13 @@ export default class RichTextEditor extends StandardControlBase {
         });
     }
 
-    updated(changedProperties) {
-        super.updated(changedProperties);
-
-        if (changedProperties.has('value')) {
-            const currentHtml = this.editor.isEmpty ? '' : this.editor.getHTML();
-            const newValue = this.value || '';
-
-            if (currentHtml !== newValue) {
-                this.editor.commands.setContent(newValue, { emitUpdate: false }); // false = emitUpdate kapatır
-                this.inputElement.value = formatEditorContent(newValue);
-                this.dispatchCustomEvent('update');
-            }
-        }
-    }
-
     valueUpdated() {
-        const currentHtml = this.editor.isEmpty ? '' : this.editor.getHTML();
+        const currentHtml = this.#getCleanEditorContent(this.editor);
         const newValue = this.value || '';
 
         if (currentHtml !== newValue) {
-            this.editor.commands.setContent(newValue, { emitUpdate: false }); // false = emitUpdate kapatır
-            this.inputElement.value = formatEditorContent(newValue);
-            this.#checkValidity(false);
+            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: 'full' } });
+            this.#onEditorUpdate(this.editor);
 
             return true;
         }
@@ -146,9 +127,9 @@ export default class RichTextEditor extends StandardControlBase {
 
         this.editor = new Editor({
             element: this.#editorContainer,
-            extensions: [...extensions, Placeholder.configure({ placeholder: this.placeholder })],
+            extensions: [...extensions],
             content: this.value, // Başlangıç değeri
-            onUpdate: this.#onEditorUpdate.bind(this),
+            onUpdate: ({ editor }) => this.#onEditorUpdate(editor),
             onTransaction: () => this.requestUpdate(), // Her işlemde component'i güncelle
         });
     }
@@ -163,23 +144,28 @@ export default class RichTextEditor extends StandardControlBase {
         return this.checkValidity();
     }
 
-    /** @param {{ editor: import('@tiptap/core').Editor }} props */
-    #onEditorUpdate(props) {
-        const editor = props.editor;
-        let htmlContent = editor.getHTML();
+    /** @param {import('@tiptap/core').Editor} editor */
+    #getCleanEditorContent(editor) {
+        const content = editor.getHTML();
 
-        // Boş editor durumunu canonical bir yapıya (<empty string>) normalize et (RT-008, RT-009, P0-004)
-        if (editor.isEmpty || htmlContent === '<p></p>') {
-            htmlContent = '';
-        }
+        return trimTrailingP(content);
+    }
+
+    /** @param {import('@tiptap/core').Editor} editor */
+    #onEditorUpdate(editor) {
+        let htmlContent = editor.getHTML();
+        htmlContent = trimTrailingP(htmlContent);
 
         // Kullanıcı kaynaklı bir değişiklik varsa value'yu güncelle ve event fırlat
         if (this.value !== htmlContent) {
             this.value = htmlContent; // RT-005, P0-002
-            this.inputElement.value = formatEditorContent(htmlContent);
-            this.#checkValidity(false);
             this.dispatchCustomEvent('input'); // EVT-001
         }
+
+        this.inputElement.value = formatEditorContent(htmlContent);
+        this.#checkValidity(false);
+
+        this.requestUpdate();
     }
 
     #onInput(event) {
@@ -187,8 +173,8 @@ export default class RichTextEditor extends StandardControlBase {
         const currentValue = formatEditorContent(this.value);
 
         if (currentValue !== newValue) {
-            this.editor.commands.setContent(newValue, { emitUpdate: false }); // false = emitUpdate kapatır
-            this.value = this.editor.isEmpty ? '' : this.editor.getHTML();
+            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: 'full' } }); // false = emitUpdate kapatır
+            this.value = this.#getCleanEditorContent(this.editor);
             this.#checkValidity(false);
             this.dispatchCustomEvent('input');
         }
@@ -204,13 +190,13 @@ export default class RichTextEditor extends StandardControlBase {
         this.requestUpdate();
     }
 
-    #onLinkFormSubmit(event) {
+    #onLinkSubmit(event) {
         /** @type {RichTextEditorLink} */
         const linkModel = event.target.value;
 
         // URL silindiyse sildiyse ve submit dediyse, linki kaldır.
         if (!linkModel.url) {
-            this.#onLinkFormRemove();
+            this.#onLinkRemove();
             return;
         }
 
@@ -231,25 +217,24 @@ export default class RichTextEditor extends StandardControlBase {
         this.#linkForm.hidePopover(); // İşlem bittikten sonra popover'ı kapat
     }
 
-    #onLinkFormCancel() {
+    #onLinkCancel() {
         this.#linkForm.hidePopover();
     }
 
-    #onLinkFormToggle(event) {
+    #onLinkToggle(event) {
         if (event.newState === 'closed') {
             this.#linkForm.value = new RichTextEditorLink();
+            this.#linkForm.reset(); // Formu sıfırla
             this.editor.commands.focus(); // Popover kapanınca odak editöre dönsün
-            this.requestUpdate();
-            this.#linkForm.requestUpdate();
         }
     }
 
-    #onLinkFormRemove() {
+    #onLinkRemove() {
         this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
         this.#linkForm.hidePopover();
     }
 
-    #onImageFormSubmit(event) {
+    #onImageSubmit(event) {
         /** @type {RichTextImage} */
         const imageModel = event.target.value;
 
@@ -259,13 +244,14 @@ export default class RichTextEditor extends StandardControlBase {
         this.#imageForm.hidePopover();
     }
 
-    #onImageFormCancel() {
+    #onImageCancel() {
         this.#imageForm.hidePopover();
     }
 
-    #onImageFormToggle(event) {
+    #onImageToggle(event) {
         if (event.newState === 'closed') {
             this.#imageForm.value = new RichTextImage();
+            this.#imageForm.reset(); // Formu sıfırla
             this.editor.commands.focus();
         }
     }
@@ -277,20 +263,6 @@ export default class RichTextEditor extends StandardControlBase {
     #toggleOrderedList = () => this.editor?.chain().focus().toggleOrderedList().run();
     #undo = () => this.editor?.chain().focus().undo().run();
     #redo = () => this.editor?.chain().focus().redo().run();
-
-    /** @param {number} from */
-    #openLinkFormPopover(from) {
-        this.#linkForm.showPopover();
-
-        const coords = this.editor.view.coordsAtPos(from); // İmlecin ekrandaki koordinatlarını al
-
-        this.#linkForm.style.margin = '0'; // Popover'ı ekranın ortasına sabitleyen varsayılan margin'i sıfırla
-        this.#linkForm.style.top = `${coords.bottom + 10}px`; // Metnin hemen altına (10px boşlukla) yerleştir
-
-        const popoverRect = this.#linkForm.getBoundingClientRect(); // Popover'ın ekranın sağından taşmasını engellemek için basit bir kontrol
-        const oveflowRight = coords.left + popoverRect.width > window.innerWidth;
-        this.#linkForm.style.left = oveflowRight ? `${window.innerWidth - popoverRect.width - 20}px` : `${coords.left}px`;
-    }
 
     #showLinkForm() {
         if (!this.editor) return;
@@ -316,7 +288,6 @@ export default class RichTextEditor extends StandardControlBase {
 
         this.#linkForm.value = new RichTextEditorLink({ text, url, blank, isBlock });
         this.#openLinkFormPopover(from);
-        this.requestUpdate();
     }
 
     #showImageForm() {
@@ -325,6 +296,25 @@ export default class RichTextEditor extends StandardControlBase {
         const { from } = this.editor.state.selection;
         const attr = this.editor.getAttributes('image');
         this.#imageForm.value = new RichTextImage({ url: attr?.src || '', alt: attr?.alt || '' });
+        this.#openImageFormPopover(from);
+    }
+
+    /** @param {number} from */
+    #openLinkFormPopover(from) {
+        this.#linkForm.showPopover();
+
+        const coords = this.editor.view.coordsAtPos(from); // İmlecin ekrandaki koordinatlarını al
+
+        this.#linkForm.style.margin = '0'; // Popover'ı ekranın ortasına sabitleyen varsayılan margin'i sıfırla
+        this.#linkForm.style.top = `${coords.bottom + 10}px`; // Metnin hemen altına (10px boşlukla) yerleştir
+
+        const popoverRect = this.#linkForm.getBoundingClientRect(); // Popover'ın ekranın sağından taşmasını engellemek için basit bir kontrol
+        const overflowRight = coords.left + popoverRect.width > window.innerWidth;
+        this.#linkForm.style.left = overflowRight ? `${window.innerWidth - popoverRect.width - 20}px` : `${coords.left}px`;
+    }
+
+    /** @param {number} from */
+    #openImageFormPopover(from) {
         this.#imageForm.showPopover();
 
         const coords = this.editor.view.coordsAtPos(from);
@@ -343,7 +333,7 @@ export default class RichTextEditor extends StandardControlBase {
         if (value === 'p') {
             chain.setParagraph().run();
         } else if (value.startsWith('h')) {
-            const level = /** @type {HeadingLevel} */ (Number.parseInt(value.charAt(1), 10));
+            const level = /** @type { 1 | 2 | 3 | 4 | 5 | 6 } */ (Number.parseInt(value.charAt(1), 10));
             chain.toggleHeading({ level }).run();
         } else if (value === 'blockquote') {
             chain.toggleBlockquote().run();
@@ -408,17 +398,48 @@ export default class RichTextEditor extends StandardControlBase {
                 @blur=${this.#onBlur}
                 data-role="source"
             ></textarea>
-            <rt-link-form
-                @submit=${this.#onLinkFormSubmit}
-                @remove=${this.#onLinkFormRemove}
-                @toggle=${this.#onLinkFormToggle}
-                @cancel=${this.#onLinkFormCancel}
-                popover="auto"
-            ></rt-link-form>
-            <rt-image-form @submit=${this.#onImageFormSubmit} @toggle=${this.#onImageFormToggle} @cancel=${this.#onImageFormCancel} popover="auto"></rt-image-form>
+            <rt-link-form @submit=${this.#onLinkSubmit} @remove=${this.#onLinkRemove} @toggle=${this.#onLinkToggle} @cancel=${this.#onLinkCancel} popover="auto"></rt-link-form>
+            <rt-image-form @submit=${this.#onImageSubmit} @toggle=${this.#onImageToggle} @cancel=${this.#onImageCancel} popover="auto"></rt-image-form>
             ${this.renderClearButton()} ${this.renderErrorMessage()}`;
     }
 }
 
 defineComponent('rt-link-form', RichTextLinkForm);
 defineComponent('rt-image-form', RichTextImageForm);
+
+/*
+npm install listesi
+esbuild ile tek dosya üretme
+importmap’e eklenecek minimal kayıt
+view içinde kullanım örneği
+*/
+
+/*
+Blokları alt alta yaz
+class ekle
+attr ekle
+link ekle
+
+*/
+
+/*
+ - Auto-resize: içerik arttıkça yüksekliğin otomatik büyümesi
+ - Min/max rows: satır sayısına göre daha kontrollü büyüme
+ - Soft limit / hard limit ayrımı: maxlength yakınında uyarı, aşınca engelleme
+ - Disabled/read-only görsel ayrımı: sadece davranış değil stil olarak da farklı görünüm
+ - Auto-select on focus: odaklanınca tüm metni seçme opsiyonu
+ - Mention / autocomplete support: @etiket, öneri listesi, chip dönüşümü
+ - Markdown mode: düz text alanı ama markdown yazım desteği
+ - Code-like mode: monospace, tab insert, satır numarası gibi geliştirici odaklı ekler
+ - Paste normalization: yapıştırılan metni temizleme veya dönüştürme
+ - Enter behavior controls: enter ile submit, shift+enter ile yeni satır gibi kurallar
+ - History / undo helpers: özellikle editor benzeri senaryolarda
+ - Autosave / draft support: yazılanı geçici olarak saklama
+ - Slot başlangıç içeriği ile birlikte initial value precedence: bunu zaten ele aldık, ama resmi API’ye bağlanabilir
+
+ Benim öncelik sıram şu olurdu:
+ - Auto-resize
+ - Min/max rows
+ - Paste normalization
+ - Markdown veya mention gibi daha özel editör özellikleri
+*/

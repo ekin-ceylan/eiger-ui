@@ -1,10 +1,9 @@
-import { html } from 'lit';
+import { html, nothing } from 'lit';
 import { Editor } from '@tiptap/core';
 import { defineComponent, ifDefined, isEmpty } from '../../modules/utilities.js';
 import { extensions, formatEditorContent, trimTrailingP } from '../../modules/rich-text-helpers/rich-text-helper.js';
 import RichTextImage from '../../models/RichTextImage.js';
 import RichTextEditorLink from '../../models/RichTextEditorLink.js';
-// import { Placeholder } from '@tiptap/extensions';
 import StandardControlBase from '../../base/standard-control-base.js';
 import { spread } from '../../modules/spread.js';
 import { RichTextImageForm, RichTextLinkForm } from './rich-text-popover-forms.js';
@@ -108,7 +107,7 @@ export default class RichTextEditor extends StandardControlBase {
         const newValue = this.value || '';
 
         if (currentHtml !== newValue) {
-            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: 'full' } });
+            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: true } });
             this.#onEditorUpdate(this.editor);
 
             return true;
@@ -173,7 +172,7 @@ export default class RichTextEditor extends StandardControlBase {
         const currentValue = formatEditorContent(this.value);
 
         if (currentValue !== newValue) {
-            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: 'full' } }); // false = emitUpdate kapatır
+            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: true } });
             this.value = this.#getCleanEditorContent(this.editor);
             this.#checkValidity(false);
             this.dispatchCustomEvent('input');
@@ -342,6 +341,13 @@ export default class RichTextEditor extends StandardControlBase {
         }
     }
 
+    /** @returns {import('lit').TemplateResult | typeof nothing} */
+    renderPlaceholder() {
+        if (!isEmpty(this.value)) return nothing;
+
+        return html`<span data-role="placeholder" aria-hidden="true">${this.placeholder}</span>`;
+    }
+
     renderButton(clickListener, label, title, ...pressedArgs) {
         const [name, attributes] = pressedArgs;
         const ariaPressed = this.editor?.isActive(name, attributes) ? 'true' : 'false';
@@ -382,25 +388,28 @@ export default class RichTextEditor extends StandardControlBase {
                 <button type="button" @click=${this.#onBtnCodeClick} aria-pressed=${this.#showSourceCode}>${'</>'}</button>
                 ${btnUndo} ${btnRedo} ${this.renderBlockSelection()} ${btnBold} ${btnItalic} ${btnStrike} ${btnBulletList} ${btnOrderedList} ${btnLink} ${btnImage}
             </div>
-            <div data-role="editor"></div>
-            <textarea
-                ${spread(this.getScopedAttrs('input'))}
-                id=${this.fieldId}
-                name=${ifDefined(this.name)}
-                ?hidden=${!this.#showSourceCode}
-                aria-labelledby=${ifDefined(this.labelId)}
-                aria-label=${ifDefined(this.hideLabel ? this.label : undefined)}
-                aria-errormessage=${ifDefined(this.errorId)}
-                aria-required=${this.required ? 'true' : 'false'}
-                aria-invalid=${ifDefined(this.ariaInvalid)}
-                ?required=${this.required}
-                @input=${this.#onInput}
-                @blur=${this.#onBlur}
-                data-role="source"
-            ></textarea>
+            <div data-role="container">
+                <div data-role="editor"></div>
+                <textarea
+                    ${spread(this.getScopedAttrs('input'))}
+                    id=${this.fieldId}
+                    name=${ifDefined(this.name)}
+                    ?hidden=${!this.#showSourceCode}
+                    aria-labelledby=${ifDefined(this.labelId)}
+                    aria-label=${ifDefined(this.hideLabel ? this.label : undefined)}
+                    aria-errormessage=${ifDefined(this.errorId)}
+                    aria-required=${this.required ? 'true' : 'false'}
+                    aria-invalid=${ifDefined(this.ariaInvalid)}
+                    ?required=${this.required}
+                    @input=${this.#onInput}
+                    @blur=${this.#onBlur}
+                    data-role="source"
+                ></textarea>
+                ${this.renderPlaceholder()} ${this.renderClearButton()}
+            </div>
             <rt-link-form @submit=${this.#onLinkSubmit} @remove=${this.#onLinkRemove} @toggle=${this.#onLinkToggle} @cancel=${this.#onLinkCancel} popover="auto"></rt-link-form>
             <rt-image-form @submit=${this.#onImageSubmit} @toggle=${this.#onImageToggle} @cancel=${this.#onImageCancel} popover="auto"></rt-image-form>
-            ${this.renderClearButton()} ${this.renderErrorMessage()}`;
+            ${this.renderErrorMessage()}`;
     }
 }
 

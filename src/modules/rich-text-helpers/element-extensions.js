@@ -1,7 +1,12 @@
-import { mergeAttributes, Node } from '@tiptap/core';
-import { TableCell, TableHeader, TableRow, Table } from '@tiptap/extension-table';
+import { mergeAttributes, Node, Mark } from '@tiptap/core';
 
 /** @typedef {import('@tiptap/core').NodeView} NodeView */
+
+const SpanMark = Mark.create({
+    name: 'span',
+    parseHTML: () => [{ tag: 'span' }],
+    renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes), 0],
+});
 
 const BlockLinkNode = Node.create({
     name: 'blockLink',
@@ -59,140 +64,85 @@ const ButtonNode = Node.create({
     renderHTML: ({ HTMLAttributes }) => ['button', mergeAttributes(HTMLAttributes), 0], // Çıktıya <button ...> olarak bas ve içeriği '0' deliğine yerleştir
     addAttributes: () => getAttributesObject('type', 'disabled', 'name', 'value'),
 });
-
-const CleanTable = Table.extend({
-    addNodeView() {
-        const parentNodeView = this.parent?.();
-
-        return props => {
-            if (!parentNodeView) return undefined;
-
-            const view = parentNodeView(props); // 1. Tiptap'ın orjinal çizim nesnesini (sürükleme motorunu) çalıştır
-
-            // 2. view.table -> Görsel editördeki GERÇEK <table> elementidir.
-            // Oraya kendi özelliklerimizi zorla (force) yazıyoruz!
-            if (view?.['table']) {
-                applyAttrs(view, props.node.attrs); // İlk render anında ekrana bas
-                const originalUpdate = view.update; // Tabloda bir değişiklik olduğunda (sürükleme vs.) özellikleri kaybetmemek için update metodunu hackliyoruz
-                view.update = newNode => {
-                    const result = originalUpdate ? originalUpdate.call(view, newNode) : true;
-                    if (result) {
-                        applyAttrs(view, newNode.attrs);
-                    }
-                    return result;
-                };
-            }
-
-            return view;
-        };
-    },
-    renderHTML({ node, HTMLAttributes }) {
-        const { style, class: className, border, cellpadding, cellspacing, ...rest } = HTMLAttributes;
-        const attrs = { ...rest };
-
-        // Kaynak koddan gelenleri aynen aktar
-        if (style) attrs.style = style;
-        if (className) attrs.class = className;
-        if (border !== null) attrs.border = border;
-        if (cellpadding !== null) attrs.cellpadding = cellpadding;
-        if (cellspacing !== null) attrs.cellspacing = cellspacing;
-
-        // Resizable için colgroup şart. Ama 'min-width: 25px' dayatmasını siliyoruz.
-        let hasWidths = false;
-        const colgroup = ['colgroup', {}];
-
-        node.forEach(row => {
-            if (!hasWidths) {
-                row.forEach(cell => {
-                    const { colwidth } = cell.attrs;
-                    // Eğer kullanıcı gerçekten sürükleyip boyut verdiyse:
-                    if (colwidth && colwidth.length > 0 && colwidth[0] !== null) {
-                        hasWidths = true;
-                        colwidth.forEach(width => {
-                            colgroup.push(['col', { style: `width: ${width}px` }]);
-                        });
-                    } else {
-                        colgroup.push(['col', {}]); // Sürükleme yoksa bomboş col bırakıyoruz
-                    }
-                });
-            }
-        });
-
-        if (this.options.resizable) {
-            return ['table', attrs, colgroup, ['tbody', 0]];
-        }
-
-        return ['table', attrs, ['tbody', 0]];
-    },
-    addAttributes: () => getAttributesObject('border', 'cellpadding', 'cellspacing'),
+// 1. TABLE
+// İçine caption, colgroup, thead, tbody, tfoot veya doğrudan tr alabilir.
+const SimpleTable = Node.create({
+    name: 'table',
+    group: 'block',
+    content: '(tableCaption | tableColgroup | tableHead | tableBody | tableFoot | tableRow)*',
+    parseHTML: () => [{ tag: 'table' }],
+    renderHTML: ({ HTMLAttributes }) => ['table', HTMLAttributes, 0],
+    addAttributes: () => getAttributesObject('border', 'cellpadding', 'cellspacing', 'width', 'summary'),
 });
 
-const CleanTableRow = TableRow.extend({
-    renderHTML({ HTMLAttributes }) {
-        const { style, class: className, ...rest } = HTMLAttributes;
-        const attrs = { ...rest };
-
-        if (style) attrs.style = style;
-        if (className) attrs.class = className;
-
-        return ['tr', attrs, 0];
-    },
+// 2. CAPTION
+const SimpleTableCaption = Node.create({
+    name: 'tableCaption',
+    content: 'inline*', // İsteğe bağlı 'block*' da yapabilirsin
+    parseHTML: () => [{ tag: 'caption' }],
+    renderHTML: ({ HTMLAttributes }) => ['caption', HTMLAttributes, 0],
+    addAttributes: () => getAttributesObject('align'),
 });
 
-const CleanTableCell = TableCell.extend({
+// 3. COLGROUP
+const SimpleTableColgroup = Node.create({
+    name: 'tableColgroup',
+    content: 'tableCol*',
+    parseHTML: () => [{ tag: 'colgroup' }],
+    renderHTML: ({ HTMLAttributes }) => ['colgroup', HTMLAttributes, 0],
+    addAttributes: () => getAttributesObject('span', 'width'),
+});
+
+// 4. COL (Kendi kapanan etiket olduğu için atom: true ve içerik deliği '0' yok)
+const SimpleTableCol = Node.create({
+    name: 'tableCol',
+    atom: true,
+    parseHTML: () => [{ tag: 'col' }],
+    renderHTML: ({ HTMLAttributes }) => ['col', HTMLAttributes],
+    addAttributes: () => getAttributesObject('span', 'width'),
+});
+
+// --- YARDIMCI FONKSİYON (thead, tbody, tfoot için ortak yapı) ---
+const createTableSection = (name, tag) =>
+    Node.create({
+        name,
+        content: 'tableRow+', // Mutlaka en az bir TR içermeli
+        parseHTML: () => [{ tag }],
+        renderHTML: ({ HTMLAttributes }) => [tag, HTMLAttributes, 0],
+        addAttributes: () => getAttributesObject('align', 'valign'),
+    });
+
+// 5, 6, 7. THEAD, TBODY, TFOOT
+const SimpleTableHead = createTableSection('tableHead', 'thead');
+const SimpleTableBody = createTableSection('tableBody', 'tbody');
+const SimpleTableFoot = createTableSection('tableFoot', 'tfoot');
+
+// 8. TABLE ROW (TR)
+const SimpleTableRow = Node.create({
+    name: 'tableRow',
+    content: '(tableCell | tableHeader)*',
+    parseHTML: () => [{ tag: 'tr' }],
+    renderHTML: ({ HTMLAttributes }) => ['tr', HTMLAttributes, 0],
+    addAttributes: () => getAttributesObject('align', 'valign'),
+});
+
+// 9. TABLE CELL (TD)
+const SimpleTableCell = Node.create({
+    name: 'tableCell',
     content: 'inline*',
-    renderHTML: ({ HTMLAttributes }) => cellRenderHTML(HTMLAttributes, 'td'),
+    parseHTML: () => [{ tag: 'td' }],
+    renderHTML: ({ HTMLAttributes }) => ['td', HTMLAttributes, 0],
+    addAttributes: () => getAttributesObject('colspan', 'rowspan', 'headers', 'scope', 'align', 'valign', 'width', 'height'),
 });
 
-const CleanTableHeader = TableHeader.extend({
+// 10. TABLE HEADER (TH)
+const SimpleTableHeader = Node.create({
+    name: 'tableHeader',
     content: 'inline*',
-    renderHTML: ({ HTMLAttributes }) => cellRenderHTML(HTMLAttributes, 'th'),
+    parseHTML: () => [{ tag: 'th' }],
+    renderHTML: ({ HTMLAttributes }) => ['th', HTMLAttributes, 0],
+    addAttributes: () => getAttributesObject('colspan', 'rowspan', 'headers', 'scope', 'align', 'valign', 'width', 'height'),
 });
-
-/**
- *
- * @param {Record<string, any>} HTMLAttributes
- * @param {string} tag
- * @returns {[string, ...any[]]}
- */
-function cellRenderHTML(HTMLAttributes, tag) {
-    const { style, class: className, colwidth, colspan, rowspan, ...rest } = HTMLAttributes;
-
-    let finalStyle = style || ''; // 1. Kaynaktan gelen orjinal stili koru!
-
-    // 2. Kullanıcı sütunu sürüklediyse (colwidth), stili dinamik olarak ekle
-    if (colwidth && colwidth.length > 0 && colwidth[0] !== null) {
-        finalStyle += (finalStyle ? '; ' : '') + `width: ${colwidth[0]}px`;
-    }
-
-    const attrs = { ...rest };
-    if (finalStyle.trim()) attrs.style = finalStyle.trim();
-    if (className) attrs.class = className;
-
-    // 3. Tiptap'ın otomatik eklediği gereksiz '1' değerlerini sil
-    if (colspan === 1 || colspan === '1') delete attrs.colspan;
-    if (rowspan === 1 || rowspan === '1') delete attrs.rowspan;
-
-    return [tag, attrs, 0];
-}
-
-function applyAttrs(view, attrs) {
-    applyAttr(view, attrs, 'style');
-    applyAttr(view, attrs, 'class');
-    applyAttr(view, attrs, 'border');
-    applyAttr(view, attrs, 'cellpadding');
-    applyAttr(view, attrs, 'cellspacing');
-}
-
-/**
- * @param {NodeView} view
- * @param {any} attrs
- * @param {string} tag
- */
-function applyAttr(view, attrs, tag) {
-    if (attrs[tag]) view['table'].setAttribute(tag, attrs[tag]);
-    else view['table'].removeAttribute(tag);
-}
 
 function getAttributesObject(...attributes) {
     const obj = {};
@@ -206,7 +156,22 @@ function getAttributesObject(...attributes) {
     return obj;
 }
 
-const elementExtensions = [BlockLinkNode, DivHTMLNode, InputHTMLNode, CleanTable.configure({ resizable: true }), CleanTableRow, CleanTableCell, CleanTableHeader, ButtonNode];
+const elementExtensions = [
+    BlockLinkNode,
+    DivHTMLNode,
+    InputHTMLNode,
+    ButtonNode,
+    SimpleTable,
+    SimpleTableCaption,
+    SimpleTableColgroup,
+    SimpleTableCol,
+    SimpleTableHead,
+    SimpleTableBody,
+    SimpleTableFoot,
+    SimpleTableRow,
+    SimpleTableCell,
+    SimpleTableHeader,
+    SpanMark,
+];
 
 export default elementExtensions;
-export { BlockLinkNode, DivHTMLNode, InputHTMLNode, CleanTable, CleanTableRow, CleanTableCell, CleanTableHeader };

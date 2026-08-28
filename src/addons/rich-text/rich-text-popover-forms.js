@@ -1,12 +1,16 @@
-import LightComponentBase from '../../base/light-component-base.js';
-import TextControlBase from '../../base/text-control-base.js';
-import { defineComponent } from '../../modules/utilities.js';
 import { html, nothing } from 'lit';
-import RichTextImage from '../../models/RichTextImage.js';
-import RichTextEditorLink from '../../models/RichTextEditorLink.js';
-import CheckBox from '../select/check-box.js';
+import RichTextImage from './models/RichTextImage.js';
+import RichTextEditorLink from './models/RichTextEditorLink.js';
 
-class RichTextPopoverFormBase extends LightComponentBase {
+import { LightComponentBase, TextControlBase, defineComponent, CheckBox } from 'eiger-ui';
+
+// import LightComponentBase from '../../base/light-component-base.js';
+// import TextControlBase from '../../base/text-control-base.js';
+// import CheckBox from '../../components/select/check-box.js';
+// import { defineComponent } from '../../modules/utilities.js';
+
+/** @extends {LightComponentBase} */
+export class RichTextPopoverFormBase extends LightComponentBase {
     static get properties() {
         return {
             ...super.properties,
@@ -49,6 +53,39 @@ class RichTextPopoverFormBase extends LightComponentBase {
 
     reset() {
         this.formElement?.reset();
+    }
+}
+
+/** @extends {TextControlBase} */
+export class RichTextPopoverUrlBox extends TextControlBase {
+    constructor() {
+        super();
+
+        this.placeholder = 'https://...';
+        this.pattern = String.raw`(https?://)?([a-zA-Z0-9.\-]+)\.([a-zA-Z]{2,})(/.*)?`;
+        this.maxlength = 500;
+        this.autocomplete = 'off';
+        this.spellcheck = false;
+        this.allowPattern = String.raw`\S+`;
+    }
+}
+
+export class RichTextPopoverTextBox extends TextControlBase {
+    constructor() {
+        super();
+
+        this.maxlength = 500;
+        this.autocomplete = 'off';
+        this.spellcheck = true;
+    }
+}
+
+export class RichTextPopoverCheckbox extends CheckBox {
+    constructor() {
+        super();
+
+        this.checkedValue = true;
+        this.uncheckedValue = false;
     }
 }
 
@@ -147,38 +184,6 @@ export class RichTextLinkForm extends RichTextPopoverFormBase {
                 </div>
             </form>
         `;
-    }
-}
-
-class RichTextPopoverUrlBox extends TextControlBase {
-    constructor() {
-        super();
-
-        this.placeholder = 'https://...';
-        this.pattern = String.raw`(https?://)?([a-zA-Z0-9.\-]+)\.([a-zA-Z]{2,})(/.*)?`;
-        this.maxlength = 500;
-        this.autocomplete = 'off';
-        this.spellcheck = false;
-        this.allowPattern = String.raw`\S+`;
-    }
-}
-
-class RichTextPopoverTextBox extends TextControlBase {
-    constructor() {
-        super();
-
-        this.maxlength = 500;
-        this.autocomplete = 'off';
-        this.spellcheck = true;
-    }
-}
-
-class RichTextPopoverCheckbox extends CheckBox {
-    constructor() {
-        super();
-
-        this.checkedValue = true;
-        this.uncheckedValue = false;
     }
 }
 

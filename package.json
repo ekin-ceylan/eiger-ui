@@ -13,9 +13,9 @@
             "import": "./dist/eiger-ui.js",
             "types": "./dist/eiger-ui.d.ts"
         },
-        "./with-lit": {
-            "import": "./dist/eiger-ui-with-lit.js",
-            "types": "./dist/eiger-ui.d.ts"
+        "./rich-text": {
+            "import": "./dist/eiger-ui-rich-text.js",
+            "types": "./dist/eiger-ui-rich-text.d.ts"
         },
         "./iife": {
             "import": "./dist/eiger-ui.iife.js"

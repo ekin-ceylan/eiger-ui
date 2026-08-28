@@ -1,12 +1,19 @@
 import { html, nothing } from 'lit';
 import { Editor } from '@tiptap/core';
-import { defineComponent, ifDefined, isEmpty } from '../../modules/utilities.js';
-import { extensions, formatEditorContent, trimTrailingP } from '../../modules/rich-text-helpers/rich-text-helper.js';
-import RichTextImage from '../../models/RichTextImage.js';
-import RichTextEditorLink from '../../models/RichTextEditorLink.js';
-import StandardControlBase from '../../base/standard-control-base.js';
-import { spread } from '../../modules/spread.js';
+import Image from '@tiptap/extension-image';
+import StarterKit from '@tiptap/starter-kit';
+import { formatEditorContent, trimTrailingP } from './modules/rich-text-helper.js';
+import RichTextImage from './models/RichTextImage.js';
+import RichTextEditorLink from './models/RichTextEditorLink.js';
 import { RichTextImageForm, RichTextLinkForm } from './rich-text-popover-forms.js';
+import createAttributeExtension from './modules/attribute-extensions.js';
+import createElementExtensions from './modules/element-extensions.js';
+
+import { StandardControlBase, defineComponent, ifDefined, isEmpty, spread } from 'eiger-ui';
+
+// import { defineComponent, ifDefined, isEmpty } from '../../modules/utilities.js';
+// import StandardControlBase from '../../base/standard-control-base.js';
+// import { spread } from '../../modules/spread.js';
 
 export default class RichTextEditor extends StandardControlBase {
     #cachedInput = undefined;
@@ -124,9 +131,14 @@ export default class RichTextEditor extends StandardControlBase {
         this.#editorContainer = this.renderRoot.querySelector('[data-role="editor"]');
         if (!this.#editorContainer || this.editor) return;
 
+        // const [{ Editor }, { default: StarterKit }, { default: Image }] = await loadTiptap();
+        const starterKitExtension = StarterKit.configure({ link: { openOnClick: false } });
+        const attrExtension = createAttributeExtension();
+        const elementExtensions = createElementExtensions();
+
         this.editor = new Editor({
             element: this.#editorContainer,
-            extensions: [...extensions],
+            extensions: [starterKitExtension, Image, attrExtension, ...elementExtensions],
             content: this.value, // Başlangıç değeri
             onUpdate: ({ editor }) => this.#onEditorUpdate(editor),
             onTransaction: () => this.requestUpdate(), // Her işlemde component'i güncelle
@@ -145,6 +157,7 @@ export default class RichTextEditor extends StandardControlBase {
 
     /** @param {import('@tiptap/core').Editor} editor */
     #getCleanEditorContent(editor) {
+        if (!editor) return '';
         const content = editor.getHTML();
 
         return trimTrailingP(content);

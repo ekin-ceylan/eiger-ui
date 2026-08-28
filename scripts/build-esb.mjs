@@ -14,47 +14,69 @@ const bannerText = `/*!
  */`;
 
 /** @type {esbuild.BuildOptions} */
-const esmOptions = {
-    entryPoints: ['src/index.js'],
-
+const options = {
     outdir: 'dist',
-    entryNames: 'typed-ui', // klasör yapısını korur
-
     bundle: true,
     splitting: false,
     treeShaking: true,
     format: 'esm',
     platform: 'browser',
     target: 'es2022',
-
-    minify: true,
     legalComments: 'inline', // none | linked | inline | eof
+    minify: true,
     sourcemap: false,
-
     plugins: [minifyHTMLLiteralsPlugin()],
-    external: ['lit', 'lit/*', '@tiptap', '@tiptap/*'],
-    banner: {
-        js: bannerText,
-    },
-    define: {
-        'process.env.NODE_ENV': '"production"',
-    },
+    define: { 'process.env.NODE_ENV': '"production"' },
 };
 
-const esmWithLit = {
-    ...esmOptions,
-    entryNames: 'typed-ui-with-lit', // klasör yapısını korur
-    external: ['@tiptap', '@tiptap/*'],
+/** @type {esbuild.BuildOptions} */
+const mainOptions = {
+    ...options,
+    entryPoints: ['src/exports/eiger-ui.js'],
+    banner: { js: bannerText },
+    external: ['lit', 'lit/*', '@tiptap', '@tiptap/*'],
 };
+
+const richTextOptions = {
+    ...options,
+    entryPoints: [`src/exports/${pkg.name}-rich-text.js`], // Yeni entry point
+    banner: { js: bannerText },
+    external: ['lit', 'lit/*', '@tiptap', '@tiptap/*', `${pkg.name}`],
+};
+
+/** @type {esbuild.BuildOptions} */
+const tiptapOptions = {
+    ...options,
+    entryPoints: ['src/exports/tiptap-vendor.js'],
+    plugins: [],
+};
+
+/** @type {esbuild.BuildOptions} */
+const litVendorOptions = {
+    ...options,
+    entryPoints: ['src/exports/lit-vendor.js'],
+    plugins: [],
+};
+
+// const esmWithLit = {
+//     ...options,
+//     entryNames: `${pkg.name}-with-lit`,
+//     chunkNames: '[name]',
+//     splitting: true,
+//     external: [],
+// };
 
 const iifeOptions = {
-    ...esmOptions,
-    entryNames: 'typed-ui.iife',
+    ...options,
+    entryNames: `${pkg.name}.iife`,
     external: ['@tiptap', '@tiptap/*'],
     format: 'iife',
-    globalName: 'TypedUI',
+    globalName: 'EigerUI',
 };
 
-await esbuild.build(esmOptions);
-await esbuild.build(esmWithLit);
-await esbuild.build(iifeOptions);
+await esbuild.build(mainOptions);
+await esbuild.build(richTextOptions);
+// await esbuild.build(esmWithLit);
+await esbuild.build(tiptapOptions);
+// await esbuild.build(iifeOptions);
+await esbuild.build(litVendorOptions);

@@ -11,7 +11,10 @@
         "emitDeclarationOnly": true,
         "declarationMap": false,
         "outDir": "types-tmp",
-        "skipLibCheck": true
+        "skipLibCheck": true,
+
+        "baseUrl": ".",
+        "paths": { "eiger-ui": ["./src/exports/eiger-ui.d.ts"] }
     },
     "include": ["src/**/*.js"],
     "exclude": ["src/tests/*", "src/main.js"]

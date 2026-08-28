@@ -1,4 +1,4 @@
-import RichTextEditor from '../../components/text-area/rich-text-editor.js';
+import RichTextEditor from '../../addons/rich-text/rich-text-editor.js';
 
 defineElement('rich-text-editor', RichTextEditor);
 

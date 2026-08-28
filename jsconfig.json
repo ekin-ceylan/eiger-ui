@@ -1,0 +1,5 @@
+{
+    "compilerOptions": {
+        "paths": { "eiger-ui": ["./src/exports/eiger-ui.js"] }
+    }
+}

@@ -1,12 +1,3 @@
-import Image from '@tiptap/extension-image';
-import StarterKit from '@tiptap/starter-kit';
-import elementExtensions from './element-extensions.js';
-import createAttributeExtension from './attribute-extensions.js';
-
-const attrExtension = createAttributeExtension();
-const starterKitExtension = StarterKit.configure({ link: { openOnClick: false } });
-const extensions = [starterKitExtension, Image, attrExtension, ...elementExtensions];
-
 /**
  * Formats the content of the rich text editor by adding line breaks before and after block-level HTML tags, and removing extra blank lines. This is useful for displaying the content in a more readable format when viewing the raw HTML.
  * @param {string} editorContent The raw HTML content from the rich text editor.
@@ -50,4 +41,17 @@ function trimTrailingP(html) {
     return html;
 }
 
-export { extensions, formatEditorContent, trimTrailingP };
+export { formatEditorContent, trimTrailingP };
+
+/*
+TODO: İleride İhtiyaç Duyulabilecek Spesifik Nitelikler (Edge Cases)
+---------------------------------------------------------------------
+* Numaralı Listeler (orderedList - <ol>):
+  - 'start' -> Listeyi 1'den değil, istenen sayıdan başlatmak için.
+
+* Kod Blokları (codeBlock - <pre><code>):
+  - 'language' -> Kodun hangi dilde yazıldığını tutmak için (Tiptap bunu genellikle kendi yönetir ama manuel müdahale gerekebilir).
+
+* Videolar / Gömülü İçerikler (İleride iframe veya video eklentisi yazılırsa):
+  - 'allowfullscreen', 'frameborder', 'controls', 'autoplay', 'muted' vb.
+*/

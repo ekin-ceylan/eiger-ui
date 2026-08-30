@@ -1,16 +1,10 @@
 import { html, nothing } from 'lit';
+import { LightComponentBase, TextControlBase, defineComponent, CheckBox } from 'custom-ui';
 import RichTextImage from './models/RichTextImage.js';
 import RichTextEditorLink from './models/RichTextEditorLink.js';
 
-import { LightComponentBase, TextControlBase, defineComponent, CheckBox } from 'eiger-ui';
-
-// import LightComponentBase from '../../base/light-component-base.js';
-// import TextControlBase from '../../base/text-control-base.js';
-// import CheckBox from '../../components/select/check-box.js';
-// import { defineComponent } from '../../modules/utilities.js';
-
 /** @extends {LightComponentBase} */
-export class RichTextPopoverFormBase extends LightComponentBase {
+class RichTextPopoverFormBase extends LightComponentBase {
     static get properties() {
         return {
             ...super.properties,
@@ -57,7 +51,7 @@ export class RichTextPopoverFormBase extends LightComponentBase {
 }
 
 /** @extends {TextControlBase} */
-export class RichTextPopoverUrlBox extends TextControlBase {
+class RichTextPopoverUrlBox extends TextControlBase {
     constructor() {
         super();
 
@@ -70,7 +64,7 @@ export class RichTextPopoverUrlBox extends TextControlBase {
     }
 }
 
-export class RichTextPopoverTextBox extends TextControlBase {
+class RichTextPopoverTextBox extends TextControlBase {
     constructor() {
         super();
 
@@ -80,7 +74,7 @@ export class RichTextPopoverTextBox extends TextControlBase {
     }
 }
 
-export class RichTextPopoverCheckbox extends CheckBox {
+class RichTextPopoverCheckbox extends CheckBox {
     constructor() {
         super();
 

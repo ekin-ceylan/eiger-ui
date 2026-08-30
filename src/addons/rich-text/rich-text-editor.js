@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
 import { Editor } from '@tiptap/core';
-import Image from '@tiptap/extension-image';
 import StarterKit from '@tiptap/starter-kit';
+import { SlotCollectorMixin, StandardControlBase, defineComponent, ifDefined, isEmpty, mixins, spread } from 'custom-ui';
 import { formatEditorContent, trimTrailingP } from './modules/rich-text-helper.js';
 import RichTextImage from './models/RichTextImage.js';
 import RichTextEditorLink from './models/RichTextEditorLink.js';
@@ -9,13 +9,12 @@ import { RichTextImageForm, RichTextLinkForm } from './rich-text-popover-forms.j
 import createAttributeExtension from './modules/attribute-extensions.js';
 import createElementExtensions from './modules/element-extensions.js';
 
-import { StandardControlBase, defineComponent, ifDefined, isEmpty, spread } from 'eiger-ui';
-
-// import { defineComponent, ifDefined, isEmpty } from '../../modules/utilities.js';
-// import StandardControlBase from '../../base/standard-control-base.js';
-// import { spread } from '../../modules/spread.js';
-
-export default class RichTextEditor extends StandardControlBase {
+/**
+ * Rich Text Editor component for the Custom UI library.
+ * Provides a rich text editing interface with support for images, links, and various text formatting options.
+ */
+export default class RichTextEditor extends mixins(StandardControlBase, SlotCollectorMixin) {
+    #slotContent = '';
     #cachedInput = undefined;
     /** @type {HTMLElement | null} */
     #editorContainer = null;
@@ -92,21 +91,52 @@ export default class RichTextEditor extends StandardControlBase {
         this.#linkForm = this.renderRoot.querySelector('rt-link-form');
         this.#imageForm = this.renderRoot.querySelector('rt-image-form');
 
-        this.#editorContainer.addEventListener('mouseover', event => {
-            // Tıklanan öğe veya onun bir üst öğesi <a> etiketi mi?
-            const target = /** @type {HTMLElement} */ (event.target);
-            const linkElement = target.closest('a');
+        // this.#editorContainer.addEventListener('mouseover', event => {
+        //     // Tıklanan öğe veya onun bir üst öğesi <a> etiketi mi?
+        //     const target = /** @type {HTMLElement} */ (event.target);
+        //     const linkElement = target.closest('a');
 
-            if (linkElement) {
-                // event.preventDefault(); // İsteğe bağlı: Linkin sayfayı değiştirmesini engelle
+        //     if (linkElement) {
+        //         // event.preventDefault(); // İsteğe bağlı: Linkin sayfayı değiştirmesini engelle
 
-                const url = linkElement.getAttribute('href');
-                console.log('hover!', url);
-                console.log('Tıklanan DOM Elementi:', linkElement);
+        //         const url = linkElement.getAttribute('href');
+        //         console.log('hover!', url);
+        //         console.log('Tıklanan DOM Elementi:', linkElement);
 
-                // Burada istediğin işlemi yapabilirsin (Örn: özel bir tooltip açmak)
-            }
-        });
+        //         // Burada istediğin işlemi yapabilirsin (Örn: özel bir tooltip açmak)
+        //     }
+        // });
+    }
+
+    // #region INTERNAL HOOKS
+
+    /**
+     * @param {HTMLElement|Text} node
+     * @param {string} slotName
+     * @returns {boolean}
+     * @override
+     */
+    validateNode(node, slotName) {
+        if (slotName !== 'default') return true;
+
+        if (!isEmpty(this.value)) {
+            console.warn('Value is already set via property. Ignoring slotted nodes.');
+            return false;
+        }
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            this.#slotContent += node.textContent.trim() ?? '';
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            this.#slotContent += /** @type {HTMLElement} */ (node).outerHTML ?? '';
+        }
+
+        return false;
+    }
+
+    afterSlotsBinded(hasProjectedContent) {
+        if (hasProjectedContent && isEmpty(this.value)) {
+            this.value = this.#slotContent;
+        }
     }
 
     valueUpdated() {
@@ -127,18 +157,19 @@ export default class RichTextEditor extends StandardControlBase {
         this.addEventListener('input', _e => this.dispatchCustomEvent('first-interaction'), { once: true });
     }
 
+    // #endregion INTERNAL HOOKS
+
     #initEditor() {
         this.#editorContainer = this.renderRoot.querySelector('[data-role="editor"]');
         if (!this.#editorContainer || this.editor) return;
 
-        // const [{ Editor }, { default: StarterKit }, { default: Image }] = await loadTiptap();
-        const starterKitExtension = StarterKit.configure({ link: { openOnClick: false } });
+        const starterKitExtension = StarterKit.configure({ link: { openOnClick: false, markdownLinks: true } });
         const attrExtension = createAttributeExtension();
         const elementExtensions = createElementExtensions();
 
         this.editor = new Editor({
             element: this.#editorContainer,
-            extensions: [starterKitExtension, Image, attrExtension, ...elementExtensions],
+            extensions: [starterKitExtension, attrExtension, ...elementExtensions],
             content: this.value, // Başlangıç değeri
             onUpdate: ({ editor }) => this.#onEditorUpdate(editor),
             onTransaction: () => this.requestUpdate(), // Her işlemde component'i güncelle
@@ -252,7 +283,7 @@ export default class RichTextEditor extends StandardControlBase {
 
         if (!imageModel.url) return;
 
-        this.editor.chain().focus().setImage(imageModel.node).run();
+        this.editor.chain().focus().insertContent({ type: 'image', attrs: imageModel.node }).run();
         this.#imageForm.hidePopover();
     }
 

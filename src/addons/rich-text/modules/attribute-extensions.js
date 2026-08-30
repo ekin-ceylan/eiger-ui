@@ -7,9 +7,7 @@ import createElementExtensions from './element-extensions.js';
  * Creates and returns a Tiptap extension that adds global attributes to all supported elements in the rich text editor. The extension allows for the inclusion of data attributes, ARIA attributes, and other common HTML attributes on various elements.
  * @returns {import('@tiptap/core').Extension}
  */
-function createAttributeExtension() {
-    // const [{ Extension }] = await loadTiptap();
-
+export default function createAttributeExtension() {
     const elementExtensions = createElementExtensions();
     const extendedElementNames = elementExtensions.map(ext => ext.name);
 
@@ -93,5 +91,3 @@ function createAttributeObject(attrName) {
         },
     };
 }
-
-export default createAttributeExtension;

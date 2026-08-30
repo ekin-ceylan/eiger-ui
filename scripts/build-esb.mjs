@@ -13,6 +13,13 @@ const bannerText = `/*!
  * Released under the ${pkg.license} License
  */`;
 
+const bannerTextAddon = `/*!
+ * @license
+ * ${pkg.name} Rich Text Addon
+ * (c) ${new Date().getFullYear()} ${author}
+ * Released under the ${pkg.license} License
+ */`;
+
 /** @type {esbuild.BuildOptions} */
 const options = {
     outdir: 'dist',
@@ -32,7 +39,7 @@ const options = {
 /** @type {esbuild.BuildOptions} */
 const mainOptions = {
     ...options,
-    entryPoints: ['src/exports/eiger-ui.js'],
+    entryPoints: ['src/exports/custom-ui.js'],
     banner: { js: bannerText },
     external: ['lit', 'lit/*', '@tiptap', '@tiptap/*'],
 };
@@ -40,21 +47,17 @@ const mainOptions = {
 const richTextOptions = {
     ...options,
     entryPoints: [`src/exports/${pkg.name}-rich-text.js`], // Yeni entry point
-    banner: { js: bannerText },
+    banner: { js: bannerTextAddon },
     external: ['lit', 'lit/*', '@tiptap', '@tiptap/*', `${pkg.name}`],
 };
 
 /** @type {esbuild.BuildOptions} */
-const tiptapOptions = {
+const vendorOptions = {
     ...options,
-    entryPoints: ['src/exports/tiptap-vendor.js'],
-    plugins: [],
-};
-
-/** @type {esbuild.BuildOptions} */
-const litVendorOptions = {
-    ...options,
-    entryPoints: ['src/exports/lit-vendor.js'],
+    entryPoints: {
+        [`${pkg.name}-lit-vendor`]: 'src/exports/vendors/lit.js',
+        [`${pkg.name}-tiptap-vendor`]: 'src/exports/vendors/tiptap.js',
+    },
     plugins: [],
 };
 
@@ -71,12 +74,11 @@ const iifeOptions = {
     entryNames: `${pkg.name}.iife`,
     external: ['@tiptap', '@tiptap/*'],
     format: 'iife',
-    globalName: 'EigerUI',
+    globalName: 'CustomUI',
 };
 
 await esbuild.build(mainOptions);
 await esbuild.build(richTextOptions);
+await esbuild.build(vendorOptions);
 // await esbuild.build(esmWithLit);
-await esbuild.build(tiptapOptions);
 // await esbuild.build(iifeOptions);
-await esbuild.build(litVendorOptions);

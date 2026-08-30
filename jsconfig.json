@@ -1,5 +1,5 @@
 {
     "compilerOptions": {
-        "paths": { "eiger-ui": ["./src/exports/eiger-ui.js"] }
+        "paths": { "custom-ui": ["./src/exports/custom-ui.js"] }
     }
 }

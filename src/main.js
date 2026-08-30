@@ -1,5 +1,6 @@
 import TextBox from './components/text-input/text-box';
 import TextArea from './components/text-area/text-area.js';
+import RichTextEditor from './addons/rich-text/rich-text-editor.js';
 import PhoneBox from './components/text-input/phone-box';
 import EmailBox from './components/text-input/email-box';
 import PlateBox from './components/text-input/plate-box.js';
@@ -40,5 +41,5 @@ defineComponent('combo-box', ComboBox);
 defineComponent('range-select', RangeSelect);
 defineComponent('modal-dialog', ModalDialog);
 defineComponent('tc-box', TcBox);
-
+defineComponent('rich-text-editor', RichTextEditor);
 defineComponent('text-area', TextArea);

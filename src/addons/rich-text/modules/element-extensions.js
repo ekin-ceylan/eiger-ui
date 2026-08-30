@@ -1,4 +1,7 @@
-import { mergeAttributes, Node, Mark } from '@tiptap/core';
+import { mergeAttributes, Node, Mark, nodeInputRule, nodePasteRule } from '@tiptap/core';
+
+const imageInputRegex = /(?:^|\s)(!\[([^\]]*)]\((\S+?)(?:\s+(?:"([^"]*)"|'([^']*)'))?\))$/;
+const imagePasteRegex = /!\[([^\]]*)]\((\S+?)(?:\s+(?:"([^"]*)"|'([^']*)'))?\)/g;
 
 /** @type {(Node | Mark)[]} */
 let elementExtensions = [];
@@ -7,7 +10,7 @@ let elementExtensions = [];
  * Creates and returns the array of Tiptap element extensions (NodeView array).
  * @returns {(Node | Mark)[]}
  */
-function createElementExtensions() {
+export default function createElementExtensions() {
     if (elementExtensions.length > 0) return elementExtensions; // Eğer zaten oluşturulmuşsa tekrar oluşturma
 
     const SpanMark = Mark.create({
@@ -72,6 +75,40 @@ function createElementExtensions() {
         renderHTML: ({ HTMLAttributes }) => ['button', mergeAttributes(HTMLAttributes), 0], // Çıktıya <button ...> olarak bas ve içeriği '0' deliğine yerleştir
         addAttributes: () => getAttributesObject('type', 'disabled', 'name', 'value'),
     });
+
+    const ImageNode = Node.create({
+        name: 'image',
+        group: 'block',
+        atom: true,
+        draggable: true,
+        addAttributes: () => getAttributesObject('src', 'alt', 'title', 'width', 'height'),
+        parseHTML: () => [{ tag: 'img[src]', getAttrs: element => (isAllowedImageSource(element.getAttribute('src')) ? null : false) }],
+        renderHTML: ({ HTMLAttributes }) => ['img', mergeAttributes(HTMLAttributes)],
+        parseMarkdown: (token, helpers) => helpers.createNode('image', { src: token.href, title: token.title, alt: token.text }),
+        renderMarkdown: node => {
+            const { src = '', alt = '', title = '' } = node.attrs ?? {};
+            return title ? `![${alt}](${src} "${title}")` : `![${alt}](${src})`;
+        },
+        addInputRules() {
+            return [
+                nodeInputRule({
+                    find: findImageInput,
+                    type: this.type,
+                    getAttributes: getImageAttributes,
+                }),
+            ];
+        },
+        addPasteRules() {
+            return [
+                nodePasteRule({
+                    find: findImagesToPaste,
+                    type: this.type,
+                    getAttributes: getImageAttributes,
+                }),
+            ];
+        },
+    });
+
     // 1. TABLE
     // İçine caption, colgroup, thead, tbody, tfoot veya doğrudan tr alabilir.
     const SimpleTable = Node.create({
@@ -157,6 +194,7 @@ function createElementExtensions() {
         DivHTMLNode,
         InputHTMLNode,
         ButtonNode,
+        ImageNode,
         SimpleTable,
         SimpleTableCaption,
         SimpleTableColgroup,
@@ -173,6 +211,48 @@ function createElementExtensions() {
     return elementExtensions;
 }
 
+function getImageRuleData(match, offset = 0) {
+    const alt = match[offset + 1];
+    const src = match[offset + 2];
+    const doubleQuotedTitle = match[offset + 3];
+    const singleQuotedTitle = match[offset + 4];
+
+    return { src, alt, title: doubleQuotedTitle ?? singleQuotedTitle };
+}
+
+function findImageInput(text) {
+    const match = imageInputRegex.exec(text);
+    if (!match) return null;
+
+    const data = getImageRuleData(match, 1);
+    if (!isAllowedImageSource(data.src)) return null;
+
+    return { index: match.index, text: match[0], data };
+}
+
+function findImagesToPaste(text) {
+    return Array.from(text.matchAll(imagePasteRegex), match => ({
+        index: match.index,
+        text: match[0],
+        data: getImageRuleData(match),
+    })).filter(match => isAllowedImageSource(match.data.src));
+}
+
+function getImageAttributes(match) {
+    return match.data;
+}
+
+function isAllowedImageSource(src) {
+    if (!src || /[\u0000-\u001F\u007F]/.test(src)) return false;
+
+    try {
+        const url = new URL(src, 'https://localhost');
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
 function getAttributesObject(...attributes) {
     const obj = {};
 
@@ -184,5 +264,3 @@ function getAttributesObject(...attributes) {
 
     return obj;
 }
-
-export default createElementExtensions;

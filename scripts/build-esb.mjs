@@ -31,7 +31,6 @@ const options = {
     target: 'es2022',
     legalComments: 'inline', // none | linked | inline | eof
     minify: true,
-    sourcemap: false,
     plugins: [minifyHTMLLiteralsPlugin()],
     define: { 'process.env.NODE_ENV': '"production"' },
 };
@@ -42,6 +41,7 @@ const mainOptions = {
     entryPoints: ['src/exports/custom-ui.js'],
     banner: { js: bannerText },
     external: ['lit', 'lit/*', '@tiptap', '@tiptap/*'],
+    sourcemap: 'linked',
 };
 
 const richTextOptions = {
@@ -49,6 +49,7 @@ const richTextOptions = {
     entryPoints: [`src/exports/${pkg.name}-rich-text.js`], // Yeni entry point
     banner: { js: bannerTextAddon },
     external: ['lit', 'lit/*', '@tiptap', '@tiptap/*', `${pkg.name}`],
+    sourcemap: 'linked',
 };
 
 /** @type {esbuild.BuildOptions} */
@@ -71,7 +72,8 @@ const vendorOptions = {
 
 const iifeOptions = {
     ...options,
-    entryNames: `${pkg.name}.iife`,
+    entryPoints: ['src/exports/custom-ui.iife.js'],
+    banner: { js: bannerText },
     external: ['@tiptap', '@tiptap/*'],
     format: 'iife',
     globalName: 'CustomUI',
@@ -80,5 +82,6 @@ const iifeOptions = {
 await esbuild.build(mainOptions);
 await esbuild.build(richTextOptions);
 await esbuild.build(vendorOptions);
+await esbuild.build(iifeOptions);
 // await esbuild.build(esmWithLit);
-// await esbuild.build(iifeOptions);
+//

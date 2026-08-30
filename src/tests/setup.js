@@ -3,7 +3,6 @@
 
 // import { describe, it, expect, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import InputBase from '../base/input-base';
 
 /**
  * Initializes a InputBase component for testing.

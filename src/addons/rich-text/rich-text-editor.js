@@ -14,6 +14,8 @@ import createElementExtensions from './modules/element-extensions.js';
  * Provides a rich text editing interface with support for images, links, and various text formatting options.
  */
 export default class RichTextEditor extends mixins(StandardControlBase, SlotCollectorMixin) {
+    /** @type {Editor | null} */
+    #editor = null;
     #slotContent = '';
     #cachedInput = undefined;
     /** @type {HTMLElement | null} */
@@ -35,15 +37,15 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     }
 
     get activeBlock() {
-        if (!this.editor) return 'p';
-        if (this.editor.isActive('heading', { level: 1 })) return 'h1';
-        if (this.editor.isActive('heading', { level: 2 })) return 'h2';
-        if (this.editor.isActive('heading', { level: 3 })) return 'h3';
-        if (this.editor.isActive('heading', { level: 4 })) return 'h4';
-        if (this.editor.isActive('heading', { level: 5 })) return 'h5';
-        if (this.editor.isActive('heading', { level: 6 })) return 'h6';
-        if (this.editor.isActive('blockquote')) return 'blockquote';
-        if (this.editor.isActive('codeBlock')) return 'codeBlock';
+        if (!this.#editor) return 'p';
+        if (this.#editor.isActive('heading', { level: 1 })) return 'h1';
+        if (this.#editor.isActive('heading', { level: 2 })) return 'h2';
+        if (this.#editor.isActive('heading', { level: 3 })) return 'h3';
+        if (this.#editor.isActive('heading', { level: 4 })) return 'h4';
+        if (this.#editor.isActive('heading', { level: 5 })) return 'h5';
+        if (this.#editor.isActive('heading', { level: 6 })) return 'h6';
+        if (this.#editor.isActive('blockquote')) return 'blockquote';
+        if (this.#editor.isActive('codeBlock')) return 'codeBlock';
         return 'p';
     }
 
@@ -62,15 +64,14 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     constructor() {
         super();
         this.value = '';
-        this.placeholder = 'Bir şeyler yazın...'; // Varsayılan yer tutucu metin
-        this.editor = null;
+        this.placeholder = ''; // Varsayılan yer tutucu metin
     }
 
     connectedCallback() {
         super.connectedCallback();
 
         // Component DOM'a tekrar eklendiyse (reconnect), editörü yeniden başlat (RT-012)
-        if (this.hasUpdated && !this.editor) {
+        if (this.hasUpdated && !this.#editor) {
             this.updateComplete.then(() => this.#initEditor());
         }
     }
@@ -78,9 +79,9 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     disconnectedCallback() {
         super.disconnectedCallback();
         // DOM'dan çıkışta editör instance'ını temizle (RT-011, P0-029)
-        if (this.editor) {
-            this.editor.destroy();
-            this.editor = null;
+        if (this.#editor) {
+            this.#editor.destroy();
+            this.#editor = null;
         }
     }
 
@@ -139,13 +140,14 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         }
     }
 
+    /** @override @protected */
     valueUpdated() {
-        const currentHtml = this.#getCleanEditorContent(this.editor);
+        const currentHtml = this.#getCleanEditorContent(this.#editor);
         const newValue = this.value || '';
 
         if (currentHtml !== newValue) {
-            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: true } });
-            this.#onEditorUpdate(this.editor);
+            this.#editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: true } });
+            this.#onEditorUpdate(this.#editor);
 
             return true;
         }
@@ -161,19 +163,22 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
     #initEditor() {
         this.#editorContainer = this.renderRoot.querySelector('[data-role="editor"]');
-        if (!this.#editorContainer || this.editor) return;
+        if (!this.#editorContainer || this.#editor) return;
 
         const starterKitExtension = StarterKit.configure({ link: { openOnClick: false, markdownLinks: true } });
         const attrExtension = createAttributeExtension();
         const elementExtensions = createElementExtensions();
 
-        this.editor = new Editor({
+        this.#editor = new Editor({
             element: this.#editorContainer,
             extensions: [starterKitExtension, attrExtension, ...elementExtensions],
-            content: this.value, // Başlangıç değeri
+            content: this.value,
             onUpdate: ({ editor }) => this.#onEditorUpdate(editor),
             onTransaction: () => this.requestUpdate(), // Her işlemde component'i güncelle
         });
+
+        this.#onEditorUpdate(this.#editor);
+        // this.inputElement.value = formatEditorContent(this.value);
     }
 
     #checkValidity(force = false) {
@@ -216,8 +221,8 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         const currentValue = formatEditorContent(this.value);
 
         if (currentValue !== newValue) {
-            this.editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: true } });
-            this.value = this.#getCleanEditorContent(this.editor);
+            this.#editor.commands.setContent(newValue, { emitUpdate: false, parseOptions: { preserveWhitespace: true } });
+            this.value = this.#getCleanEditorContent(this.#editor);
             this.#checkValidity(false);
             this.dispatchCustomEvent('input');
         }
@@ -243,14 +248,14 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
             return;
         }
 
-        const chain = this.editor.chain().focus();
+        const chain = this.#editor.chain().focus();
 
         if (linkModel.isBlock) {
             const target = linkModel.blank ? '_blank' : null;
             chain.updateAttributes('blockLink', { href: linkModel.url, target }).run();
         } else {
             // düzenleme moduysa tüm linki seç
-            if (this.editor.isActive('link')) {
+            if (this.#editor.isActive('link')) {
                 chain.extendMarkRange('link');
             }
 
@@ -268,12 +273,12 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         if (event.newState === 'closed') {
             this.#linkForm.value = new RichTextEditorLink();
             this.#linkForm.reset(); // Formu sıfırla
-            this.editor.commands.focus(); // Popover kapanınca odak editöre dönsün
+            this.#editor.commands.focus(); // Popover kapanınca odak editöre dönsün
         }
     }
 
     #onLinkRemove() {
-        this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
+        this.#editor.chain().focus().extendMarkRange('link').unsetLink().run();
         this.#linkForm.hidePopover();
     }
 
@@ -283,7 +288,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
         if (!imageModel.url) return;
 
-        this.editor.chain().focus().insertContent({ type: 'image', attrs: imageModel.node }).run();
+        this.#editor.chain().focus().insertContent({ type: 'image', attrs: imageModel.node }).run();
         this.#imageForm.hidePopover();
     }
 
@@ -295,49 +300,49 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         if (event.newState === 'closed') {
             this.#imageForm.value = new RichTextImage();
             this.#imageForm.reset(); // Formu sıfırla
-            this.editor.commands.focus();
+            this.#editor.commands.focus();
         }
     }
 
-    #toggleBold = () => this.editor?.chain().focus().toggleBold().run();
-    #toggleItalic = () => this.editor?.chain().focus().toggleItalic().run();
-    #toggleStrike = () => this.editor?.chain().focus().toggleStrike().run();
-    #toggleBulletList = () => this.editor?.chain().focus().toggleBulletList().run();
-    #toggleOrderedList = () => this.editor?.chain().focus().toggleOrderedList().run();
-    #undo = () => this.editor?.chain().focus().undo().run();
-    #redo = () => this.editor?.chain().focus().redo().run();
+    #toggleBold = () => this.#editor?.chain().focus().toggleBold().run();
+    #toggleItalic = () => this.#editor?.chain().focus().toggleItalic().run();
+    #toggleStrike = () => this.#editor?.chain().focus().toggleStrike().run();
+    #toggleBulletList = () => this.#editor?.chain().focus().toggleBulletList().run();
+    #toggleOrderedList = () => this.#editor?.chain().focus().toggleOrderedList().run();
+    #undo = () => this.#editor?.chain().focus().undo().run();
+    #redo = () => this.#editor?.chain().focus().redo().run();
 
     #showLinkForm() {
-        if (!this.editor) return;
+        if (!this.#editor) return;
 
-        let { from, to, empty } = this.editor.state.selection;
-        const chain = this.editor.chain().focus();
-        const isLink = this.editor.isActive('link');
-        const isBlock = this.editor.isActive('blockLink');
+        let { from, to, empty } = this.#editor.state.selection;
+        const chain = this.#editor.chain().focus();
+        const isLink = this.#editor.isActive('link');
+        const isBlock = this.#editor.isActive('blockLink');
 
         // linkin içinde ama seçim yoksa seçimi genişlet
         if (isLink && empty) {
             chain.extendMarkRange('link').run();
-            const newSelection = this.editor.state.selection;
+            const newSelection = this.#editor.state.selection;
             from = newSelection.from;
             to = newSelection.to;
             empty = newSelection.empty;
         }
 
-        const linkAttrs = isBlock ? this.editor.getAttributes('blockLink') : this.editor.getAttributes('link');
+        const linkAttrs = isBlock ? this.#editor.getAttributes('blockLink') : this.#editor.getAttributes('link');
         const url = linkAttrs?.href || '';
         const blank = linkAttrs?.target === '_blank';
-        const text = empty || isBlock ? '' : this.editor.state.doc.textBetween(from, to, ' ');
+        const text = empty || isBlock ? '' : this.#editor.state.doc.textBetween(from, to, ' ');
 
         this.#linkForm.value = new RichTextEditorLink({ text, url, blank, isBlock });
         this.#openLinkFormPopover(from);
     }
 
     #showImageForm() {
-        if (!this.editor) return;
+        if (!this.#editor) return;
 
-        const { from } = this.editor.state.selection;
-        const attr = this.editor.getAttributes('image');
+        const { from } = this.#editor.state.selection;
+        const attr = this.#editor.getAttributes('image');
         this.#imageForm.value = new RichTextImage({ url: attr?.src || '', alt: attr?.alt || '' });
         this.#openImageFormPopover(from);
     }
@@ -346,7 +351,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     #openLinkFormPopover(from) {
         this.#linkForm.showPopover();
 
-        const coords = this.editor.view.coordsAtPos(from); // İmlecin ekrandaki koordinatlarını al
+        const coords = this.#editor.view.coordsAtPos(from); // İmlecin ekrandaki koordinatlarını al
 
         this.#linkForm.style.margin = '0'; // Popover'ı ekranın ortasına sabitleyen varsayılan margin'i sıfırla
         this.#linkForm.style.top = `${coords.bottom + 10}px`; // Metnin hemen altına (10px boşlukla) yerleştir
@@ -360,7 +365,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     #openImageFormPopover(from) {
         this.#imageForm.showPopover();
 
-        const coords = this.editor.view.coordsAtPos(from);
+        const coords = this.#editor.view.coordsAtPos(from);
         this.#imageForm.style.margin = '0';
         this.#imageForm.style.top = `${coords.bottom + 10}px`;
 
@@ -371,7 +376,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
     #handleBlockTypeChange(e) {
         const value = e.target.value;
-        const chain = this.editor.chain().focus();
+        const chain = this.#editor.chain().focus();
 
         if (value === 'p') {
             chain.setParagraph().run();
@@ -394,7 +399,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
     renderButton(clickListener, label, title, ...pressedArgs) {
         const [name, attributes] = pressedArgs;
-        const ariaPressed = this.editor?.isActive(name, attributes) ? 'true' : 'false';
+        const ariaPressed = this.#editor?.isActive(name, attributes) ? 'true' : 'false';
         return html`<button type="button" @click=${clickListener} aria-pressed=${ariaPressed} title="${title}">${label}</button>`;
     }
 
@@ -413,8 +418,8 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     }
 
     render() {
-        const canUndo = this.editor?.can().undo() ?? false;
-        const canRedo = this.editor?.can().redo() ?? false;
+        const canUndo = this.#editor?.can().undo() ?? false;
+        const canRedo = this.#editor?.can().redo() ?? false;
 
         const btnUndo = html`<button type="button" @click=${this.#undo} ?disabled=${!canUndo} title="${this.undoButtonTitle}">↩</button>`;
         const btnRedo = html`<button type="button" @click=${this.#redo} ?disabled=${!canRedo} title="${this.redoButtonTitle}">↪</button>`;

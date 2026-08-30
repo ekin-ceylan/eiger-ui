@@ -1,4 +1,5 @@
 import RichTextEditor from '../../addons/rich-text/rich-text-editor.js';
+import { Editor } from '@tiptap/core';
 
 defineElement('rich-text-editor', RichTextEditor);
 
@@ -9,9 +10,9 @@ describe('Rich text editor - Component / Value Contract', () => {
 
     it('RT-001 opens an editor when the component is created', async () => {
         const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const editorElement = getEditorElement(fixture);
 
-        expect(fixture.host.editor).not.toBeNull();
-        expect(fixture.querySelector('[data-role="editor"] [contenteditable="true"]')).not.toBeNull();
+        expect(editorElement).not.toBeNull();
     });
 
     it('RT-002 loads the initial HTML value into the editor', async () => {
@@ -33,10 +34,11 @@ describe('Rich text editor - Component / Value Contract', () => {
         host.setAttribute('label', 'Description');
         host.value = '<p>Before connect</p>';
         document.body.appendChild(host);
-
         await host.updateComplete;
 
-        expect(host.editor.getHTML()).toBe('<p>Before connect</p>');
+        const editorElement = getEditorElement(host);
+
+        expect(editorElement.innerHTML).toBe('<p>Before connect</p>');
         expect(host.value).toBe('<p>Before connect</p>');
     });
 
@@ -53,8 +55,8 @@ describe('Rich text editor - Component / Value Contract', () => {
 
     it('RT-005 updates the component value after a user edit', async () => {
         const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
-
-        fixture.host.editor.commands.insertContent('Typed text');
+        const editorElement = getEditorElement(fixture);
+        await fixture.user.type(editorElement, 'Typed text');
         await fixture.host.updateComplete;
 
         expect(fixture.host.value).toBe('<p>Typed text</p>');
@@ -77,14 +79,12 @@ describe('Rich text editor - Component / Value Contract', () => {
 
     it('RT-007 does not create a transaction or event when the same value is assigned again', async () => {
         const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Same</p>"></rich-text-editor>');
-        const setContent = vi.spyOn(fixture.host.editor.commands, 'setContent');
         let updateEvents = 0;
 
         fixture.host.addEventListener('update', () => updateEvents++);
         fixture.host.value = '<p>Same</p>';
         await fixture.host.updateComplete;
 
-        expect(setContent).not.toHaveBeenCalled();
         expect(updateEvents).toBe(0);
     });
 
@@ -96,7 +96,6 @@ describe('Rich text editor - Component / Value Contract', () => {
         fixture.host.value = value;
         await fixture.host.updateComplete;
 
-        expect(fixture.host.editor.isEmpty).toBe(true);
         expect(fixture.host.value).toBe('');
         expect(fixture.input.value).toBe('');
     });
@@ -114,13 +113,11 @@ describe('Rich text editor - Component / Value Contract', () => {
 
     it('RT-011 destroys the editor when the component is disconnected', async () => {
         const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
-        const editor = fixture.host.editor;
-        const destroy = vi.spyOn(editor, 'destroy');
+        const destroy = vi.spyOn(Editor.prototype, 'destroy');
 
         fixture.host.remove();
 
         expect(destroy).toHaveBeenCalledOnce();
-        expect(fixture.host.editor).toBeNull();
     });
 
     it('RT-012 creates a working editor after reconnect', async () => {
@@ -130,8 +127,11 @@ describe('Rich text editor - Component / Value Contract', () => {
         document.body.appendChild(fixture.host);
         await fixture.host.updateComplete;
 
-        expect(fixture.host.editor).not.toBeNull();
-        fixture.host.editor.commands.insertContent('Reconnected');
+        const editorElement = fixture.querySelector('[data-role="editor"] [contenteditable="true"]');
+        expect(editorElement).not.toBeNull();
+
+        await fixture.user.click(editorElement);
+        await fixture.user.type(editorElement, 'Reconnected');
         await fixture.host.updateComplete;
 
         expect(fixture.host.value).toBe('<p>Reconnected</p>');
@@ -144,12 +144,16 @@ describe('Rich text editor - Component / Value Contract', () => {
         first.form.appendChild(secondHost);
         await secondHost.updateComplete;
 
-        first.host.editor.commands.insertContent('First value');
+        const firstEditor = first.querySelector('[data-role="editor"] [contenteditable="true"]');
+        const secondEditor = secondHost.querySelector('[data-role="editor"] [contenteditable="true"]');
+
+        await first.user.click(firstEditor);
+        await first.user.type(firstEditor, 'First value');
         await first.host.updateComplete;
 
         expect(first.host.value).toBe('<p>First value</p>');
         expect(secondHost.value).toBe('');
-        expect(secondHost.editor.getHTML()).toBe('<p></p>');
+        expect(secondEditor.innerHTML).toBe('<p><br class="ProseMirror-trailingBreak"></p>');
     });
 
     it('RT-014 keeps toolbar and editor state isolated between instances', async () => {
@@ -159,55 +163,603 @@ describe('Rich text editor - Component / Value Contract', () => {
         first.form.appendChild(secondHost);
         await secondHost.updateComplete;
 
-        first.host.editor.commands.setContent('<p><strong>First</strong></p>');
+        const firstEditor = first.querySelector('[data-role="editor"] [contenteditable="true"]');
+        const firstBoldButton = first.querySelector('button[title="Bold"]');
+        const secondBoldButton = secondHost.querySelector('button[title="Bold"]');
+
+        await first.user.click(firstEditor);
+        await first.user.type(firstEditor, 'First');
+        await first.user.keyboard('{Control>}a{/Control}');
+        await first.user.click(firstBoldButton);
         await first.host.updateComplete;
 
-        expect(first.host.editor.isActive('bold')).toBe(true);
-        expect(secondHost.editor.isActive('bold')).toBe(false);
+        expect(first.host.value).toBe('<p><strong>First</strong></p>');
+        expect(firstBoldButton.getAttribute('aria-pressed')).toBe('true');
+        expect(secondBoldButton.getAttribute('aria-pressed')).toBe('false');
+        expect(secondHost.value).toBe('');
         expect(secondHost.activeBlock).toBe('p');
     });
 });
+
+describe('Rich text editor - Form Integration', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it('FORM-001 includes the editor value in form data when name is set', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" name="description"></rich-text-editor>');
+        fixture.host.value = '<p>Submitted</p>';
+        await fixture.host.updateComplete;
+
+        expect(new FormData(fixture.form).get('description')).toBe('<p>Submitted</p>');
+    });
+
+    it('FORM-002 excludes the editor from form data when name is not set', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        fixture.host.value = '<p>Not submitted</p>';
+        await fixture.host.updateComplete;
+
+        expect(Array.from(new FormData(fixture.form).entries())).toEqual([]);
+    });
+
+    it('FORM-003 submits the initial value', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" name="description" value="<p>Initial</p>"></rich-text-editor>');
+
+        expect(new FormData(fixture.form).get('description')).toBe('<p>Initial</p>');
+    });
+
+    it('FORM-004 submits a value changed by the user', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" name="description"></rich-text-editor>');
+        const editorElement = getEditorElement(fixture.host);
+        await fixture.user.type(editorElement, 'Changed');
+        await fixture.host.updateComplete;
+
+        expect(new FormData(fixture.form).get('description')).toBe('<p>Changed</p>');
+    });
+
+    it('FORM-005 restores the initial value on form reset', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" name="description" value="<p>Initial</p>"></rich-text-editor>');
+        fixture.host.value = '<p>Changed</p>';
+        await fixture.host.updateComplete;
+
+        fixture.form.reset();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe('<p>Initial</p>');
+    });
+
+    it('FORM-006 restores the initial value in the editor DOM on form reset', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Initial</p>"></rich-text-editor>');
+        fixture.host.value = '<p>Changed</p>';
+        await fixture.host.updateComplete;
+
+        fixture.form.reset();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.editor.getHTML()).toBe('<p>Initial</p>');
+    });
+
+    it('FORM-007 prevents editing while disabled', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Initial</p>" disabled></rich-text-editor>');
+
+        const editorElement = getEditorElement(fixture.host);
+        await fixture.user.type(editorElement, 'Changed');
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.editor.isEditable).toBe(false);
+        expect(fixture.host.value).toBe('<p>Initial</p>');
+    });
+
+    it('FORM-008 excludes a disabled editor from form data', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" name="description" value="<p>Initial</p>" disabled></rich-text-editor>');
+
+        expect(new FormData(fixture.form).has('description')).toBe(false);
+    });
+
+    it('FORM-009 prevents editing while readonly', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Initial</p>" readonly></rich-text-editor>');
+
+        const editorElement = getEditorElement(fixture.host);
+        await fixture.user.type(editorElement, 'Changed');
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.editor.isEditable).toBe(false);
+        expect(fixture.host.value).toBe('<p>Initial</p>');
+    });
+
+    it('FORM-010 includes a readonly editor in form data', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" name="description" value="<p>Initial</p>" readonly></rich-text-editor>');
+
+        expect(new FormData(fixture.form).get('description')).toBe('<p>Initial</p>');
+    });
+
+    it('FORM-011 is invalid when required and empty', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" required></rich-text-editor>');
+
+        expect(fixture.host.checkValidity()).toBe(false);
+        expect(fixture.input.validity.valueMissing).toBe(true);
+    });
+
+    it('FORM-012 is invalid when required and set to an empty paragraph', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" required></rich-text-editor>');
+        fixture.host.value = '<p></p>';
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.checkValidity()).toBe(false);
+        expect(fixture.input.validity.valueMissing).toBe(true);
+    });
+
+    it('FORM-013 becomes valid after real content is entered', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" required></rich-text-editor>');
+        expect(fixture.host.checkValidity()).toBe(false);
+
+        const editorElement = getEditorElement(fixture.host);
+        await fixture.user.type(editorElement, 'Changed');
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.checkValidity()).toBe(true);
+        expect(fixture.input.validity.valid).toBe(true);
+    });
+
+    it('FORM-014 updates validity after a programmatic value change', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" required></rich-text-editor>');
+        expect(fixture.host.checkValidity()).toBe(false);
+
+        fixture.host.value = '<p>Programmatic</p>';
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.checkValidity()).toBe(true);
+        expect(fixture.input.validity.valid).toBe(true);
+    });
+
+    it('FORM-015 enforces maxlength', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" maxlength="5"></rich-text-editor>');
+        const editorElement = getEditorElement(fixture.host);
+        await fixture.user.type(editorElement, '123456');
+        await fixture.host.updateComplete;
+
+        expect(editorElement.textContent).toBe('12345');
+        expect(fixture.host.value).toBe('<p>12345</p>');
+    });
+
+    it('FORM-016 removes the limit when maxlength is removed', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" maxlength="5"></rich-text-editor>');
+        fixture.host.removeAttribute('maxlength');
+        await fixture.host.updateComplete;
+
+        const editorElement = getEditorElement(fixture.host);
+        await fixture.user.type(editorElement, '123456');
+        await fixture.host.updateComplete;
+
+        expect(editorElement.textContent).toBe('123456');
+        expect(fixture.host.value).toBe('<p>123456</p>');
+    });
+});
+
+describe('Rich text editor - Links', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    const selectAllText = async fixture => {
+        const editorElement = getEditorElement(fixture);
+        await fixture.user.click(editorElement);
+        await fixture.user.keyboard('{Control>}a{/Control}');
+        expect(window.getSelection()?.toString()).toBe(editorElement.textContent);
+    };
+
+    const selectLink = async fixture => {
+        const link = fixture.querySelector('[data-role="editor"] a');
+        await fixture.user.click(link);
+        return link;
+    };
+
+    const openLinkForm = async fixture => {
+        await fixture.user.click(fixture.querySelector('button[title="Bağlantı Ekle"]'));
+
+        const linkForm = fixture.querySelector('rt-link-form');
+        await linkForm.updateComplete;
+        return linkForm;
+    };
+
+    const submitLinkForm = async (fixture, { text, url, blank = false }) => {
+        const linkForm = await openLinkForm(fixture);
+
+        if (text !== undefined) {
+            await fixture.user.clear(linkForm.textInput.inputElement);
+            await fixture.user.type(linkForm.textInput.inputElement, text);
+        }
+
+        await fixture.user.clear(linkForm.urlInput.inputElement);
+        if (url) await fixture.user.type(linkForm.urlInput.inputElement, url);
+
+        if (linkForm.checkInput.checked !== blank) {
+            await fixture.user.click(linkForm.checkInput.inputElement);
+        }
+
+        await fixture.user.click(linkForm.formElement.querySelector('button[type="submit"]'));
+        await fixture.host.updateComplete;
+
+        return linkForm;
+    };
+
+    it('LINK-001 adds a link to selected text', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        await selectAllText(fixture);
+
+        await submitLinkForm(fixture, { url: 'https://example.com' });
+
+        expect(fixture.host.value).toBe('<p><a rel="noopener noreferrer nofollow" href="https://example.com">Example</a></p>');
+    });
+
+    it('LINK-002 updates the URL of an existing link', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p><a href=&quot;https://old.example&quot;>Example</a></p>"></rich-text-editor>');
+        await selectLink(fixture);
+
+        await submitLinkForm(fixture, { url: 'https://new.example' });
+
+        expect(fixture.querySelector('[data-role="editor"] a')?.getAttribute('href')).toBe('https://new.example');
+    });
+
+    it('LINK-003 removes an existing link', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p><a href=&quot;https://example.com&quot;>Example</a></p>"></rich-text-editor>');
+        await selectLink(fixture);
+
+        const linkForm = await openLinkForm(fixture);
+        await fixture.user.click(Array.from(linkForm.formElement.querySelectorAll('button')).find(button => button.textContent.trim() === 'Kaldır'));
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe('<p>Example</p>');
+        expect(fixture.querySelector('[data-role="editor"] a')).toBeNull();
+    });
+
+    it('LINK-004 changes the text of an existing link', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p><a href=&quot;https://example.com&quot;>Old text</a></p>"></rich-text-editor>');
+        await selectLink(fixture);
+
+        await submitLinkForm(fixture, { text: 'New text', url: 'https://example.com' });
+
+        expect(getEditorElement(fixture).textContent).toBe('New text');
+        expect(fixture.host.value).toContain('>New text</a>');
+    });
+
+    it('LINK-005 autolinks a URL when it is typed', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const editorElement = fixture.querySelector('[data-role="editor"] [contenteditable="true"]');
+
+        await fixture.user.click(editorElement);
+        await fixture.user.type(editorElement, 'https://example.com ');
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toContain('<a');
+        expect(fixture.host.value).toContain('href="https://example.com"');
+    });
+
+    it('LINK-006 autolinks a pasted URL', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const editorElement = fixture.querySelector('[data-role="editor"] [contenteditable="true"]');
+
+        await fixture.user.click(editorElement);
+        await fixture.user.paste('https://example.com');
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toContain('<a');
+        expect(fixture.host.value).toContain('href="https://example.com"');
+    });
+
+    it('LINK-007 links selected text when a URL is pasted over it', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        const editorElement = fixture.querySelector('[data-role="editor"] [contenteditable="true"]');
+        let pastedText = '';
+        editorElement.addEventListener(
+            'paste',
+            event => {
+                pastedText = event.clipboardData.getData('text/plain');
+            },
+            { once: true }
+        );
+        editorElement.focus();
+        await fixture.user.keyboard('{Control>}a{/Control}');
+
+        expect(document.activeElement).toBe(editorElement);
+        expect(window.getSelection()?.toString()).toBe('Example');
+
+        await fixture.user.paste('https://example.com');
+        await fixture.host.updateComplete;
+
+        expect(pastedText).toBe('https://example.com');
+        expect(editorElement.textContent).toBe('Example');
+        expect(editorElement.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
+    });
+
+    it.each([
+        ['LINK-008', 'https://example.com', true],
+        ['LINK-009', 'http://example.com', true],
+        ['LINK-010', '/docs/getting-started', true],
+        ['LINK-011', 'mailto:test@example.com', true],
+        ['LINK-012', 'tel:+905551234567', true],
+        ['LINK-013', '', false],
+        ['LINK-015', 'javascript:alert(1)', false],
+        ['LINK-016', 'JaVaScRiPt:alert(1)', false],
+        ['LINK-017', 'java\nscript:alert(1)', false],
+    ])('%s applies the URL protocol policy for %s', async (_id, href, accepted) => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        await selectAllText(fixture);
+
+        await submitLinkForm(fixture, { url: href });
+
+        expect(fixture.host.value.includes('<a')).toBe(accepted);
+    });
+
+    it('LINK-014 trims surrounding whitespace from a URL', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        await selectAllText(fixture);
+
+        const linkForm = await openLinkForm(fixture);
+        linkForm.urlInput.inputElement.focus();
+        await fixture.user.paste('  https://example.com  ');
+        await fixture.user.click(linkForm.formElement.querySelector('button[type="submit"]'));
+        await fixture.host.updateComplete;
+
+        expect(fixture.querySelector('[data-role="editor"] a')?.getAttribute('href')).toBe('https://example.com');
+    });
+
+    it('LINK-018 adds the expected rel attribute to output links', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        await selectAllText(fixture);
+
+        await submitLinkForm(fixture, { url: 'https://example.com' });
+
+        expect(fixture.querySelector('[data-role="editor"] a')?.getAttribute('rel')).toBe('noopener noreferrer nofollow');
+    });
+
+    it('LINK-019 applies the requested _blank target policy', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        await selectAllText(fixture);
+
+        await submitLinkForm(fixture, { url: 'https://example.com', blank: true });
+
+        expect(fixture.querySelector('[data-role="editor"] a')?.getAttribute('target')).toBe('_blank');
+    });
+
+    it('LINK-020 disables link navigation while editing', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p><a href=&quot;https://example.com&quot;>Example</a></p>"></rich-text-editor>');
+        const link = fixture.querySelector('[data-role="editor"] a');
+        const editorElement = getEditorElement(fixture);
+        const currentUrl = location.href;
+
+        await fixture.user.click(link);
+
+        expect(location.href).toBe(currentUrl);
+        expect(document.activeElement).toBe(editorElement);
+    });
+
+    it('LINK-021 preserves a link after HTML copy and paste', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const editorElement = fixture.querySelector('[data-role="editor"] [contenteditable="true"]');
+        const clipboard = new DataTransfer();
+        clipboard.setData('text/plain', 'Example');
+        clipboard.setData('text/html', '<a href="https://example.com">Example</a>');
+
+        await fixture.user.click(editorElement);
+        await fixture.user.paste(clipboard);
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toContain('href="https://example.com"');
+        expect(editorElement.textContent).toBe('Example');
+    });
+
+    it('LINK-022 supports undo and redo for link changes', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description" value="<p>Example</p>"></rich-text-editor>');
+        const btnUndo = fixture.querySelector('button[title="Geri al"]');
+        const btnRedo = fixture.querySelector('button[title="İleri al"]');
+
+        await selectAllText(fixture);
+        await submitLinkForm(fixture, { url: 'https://example.com' });
+        expect(fixture.host.value).toContain('<a');
+        await fixture.host.updateComplete;
+
+        await fixture.user.click(btnUndo);
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe('<p>Example</p>');
+
+        await fixture.user.click(btnRedo);
+        await fixture.host.updateComplete;
+        expect(fixture.host.value).toContain('href="https://example.com"');
+    });
+});
+
+describe('Rich text editor - Images', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    const submitImageForm = async (fixture, { url, alt }) => {
+        await fixture.user.click(fixture.querySelector('button[title="Görsel Ekle"]'));
+
+        const imageForm = fixture.querySelector('rt-image-form');
+        await imageForm.updateComplete;
+        await fixture.user.type(imageForm.urlInput.inputElement, url);
+        if (alt) await fixture.user.type(imageForm.textInput.inputElement, alt);
+        await fixture.user.click(imageForm.formElement.querySelector('button[type="submit"]'));
+        await fixture.host.updateComplete;
+    };
+
+    it('IMG-002/IMG-003/IMG-004/IMG-012 preserves image HTML and attributes', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const image = '<img src="https://example.com/image.png" alt="Example" title="Preview" width="320" height="180" class="hero" data-id="42">';
+
+        fixture.host.value = image;
+        await fixture.host.updateComplete;
+
+        const serializedImage = new DOMParser().parseFromString(fixture.host.value, 'text/html').querySelector('img');
+        expect(serializedImage?.outerHTML).not.toBeNull();
+        expect(Object.fromEntries(Array.from(serializedImage.attributes, attribute => [attribute.name, attribute.value]))).toEqual({
+            src: 'https://example.com/image.png',
+            alt: 'Example',
+            title: 'Preview',
+            width: '320',
+            height: '180',
+            class: 'hero',
+            'data-id': '42',
+        });
+        const renderedImage = fixture.querySelector('[data-role="editor"] img');
+        expect(renderedImage.getAttribute('src')).toBe('https://example.com/image.png');
+        expect(renderedImage.getAttribute('alt')).toBe('Example');
+        expect(renderedImage.getAttribute('title')).toBe('Preview');
+        expect(renderedImage.getAttribute('width')).toBe('320');
+        expect(renderedImage.getAttribute('height')).toBe('180');
+        expect(renderedImage.classList).toContain('hero');
+        expect(renderedImage.getAttribute('data-id')).toBe('42');
+    });
+
+    it('IMG-001 inserts an image through the image popover', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+
+        await submitImageForm(fixture, { url: 'https://example.com/image.png', alt: 'Example' });
+
+        expect(fixture.host.value).toBe('<img src="https://example.com/image.png" alt="Example">');
+        expect(fixture.querySelector('[data-role="editor"] img')?.getAttribute('src')).toBe('https://example.com/image.png');
+    });
+
+    it('IMG-011 rejects Base64 images while parsing HTML', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+
+        fixture.host.value = '<img src="data:image/png;base64,AA==" alt="Embedded">';
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe('');
+        expect(getEditorElement(fixture).textContent).toBe('');
+    });
+});
+
+describe('Rich text editor - Markdown Conversions', () => {
+    afterEach(() => {
+        document.body.innerHTML = '';
+    });
+
+    it.each([
+        {
+            id: 'MD-001',
+            description: 'converts image syntax',
+            markdown: '![Example](https://example.com/image.png',
+            expected: '<img src="https://example.com/image.png" alt="Example">',
+        },
+        {
+            id: 'MD-002',
+            description: 'converts image syntax with a relative URL and spaced title',
+            markdown: '![The San Juan Mountains are beautiful](/assets/images/san-juan-mountains.jpg "San Juan Mountains"',
+            expected: '<img title="San Juan Mountains" src="/assets/images/san-juan-mountains.jpg" alt="The San Juan Mountains are beautiful">',
+        },
+        {
+            id: 'MD-003',
+            description: 'converts link syntax',
+            markdown: '[Example](https://example.com',
+            expected: '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">Example</a></p>',
+        },
+        {
+            id: 'MD-004',
+            description: 'does not convert links with unsafe protocols',
+            markdown: '[Bad](javascript:alert(1)',
+            expected: '<p>[Bad](javascript:alert(1))</p>',
+        },
+        {
+            id: 'MD-005',
+            description: 'does not convert images with unsafe protocols',
+            markdown: '![Bad](javascript:alert',
+            expected: '<p>![Bad](javascript:alert)</p>',
+        },
+    ])('$id $description when the closing parenthesis is typed', async ({ markdown, expected }) => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const editorElement = getEditorElement(fixture.host);
+
+        fixture.host.value = markdown;
+        editorElement.focus();
+        await fixture.user.type(editorElement, ')');
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe(expected);
+    });
+
+    it.each([
+        {
+            id: 'MD-006',
+            description: 'converts link syntax',
+            markdown: '[Example](https://example.com)',
+            expected: '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">Example</a></p>',
+        },
+        {
+            id: 'MD-007',
+            description: 'converts image syntax with a relative URL and spaced title',
+            markdown: '![The San Juan Mountains are beautiful](/assets/images/san-juan-mountains.jpg "San Juan Mountains")',
+            expected: '<img title="San Juan Mountains" src="/assets/images/san-juan-mountains.jpg" alt="The San Juan Mountains are beautiful">',
+        },
+        {
+            id: 'MD-008',
+            description: 'does not convert images with unsafe protocols',
+            markdown: '![Bad](data:image/png;base64,AA==)',
+            expected: '<p>![Bad](data:image/png;base64,AA==)</p>',
+        },
+    ])('$id $description when plain-text Markdown is pasted', async ({ markdown, expected }) => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const editorElement = getEditorElement(fixture.host);
+
+        editorElement.focus();
+        await fixture.user.paste(markdown);
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe(expected);
+    });
+});
+
+/** @return {HTMLElement | null} */
+function getEditorElement(host) {
+    return host.querySelector('[data-role="editor"] [contenteditable="true"]');
+}
 
 /*
 # Rich Text Editor Test Case Listesi
 
 ## 1. Component / Value Contract
 
-* [ ] RT-001 — Component boş oluşturulduğunda editor açılır.
-* [ ] RT-002 — Başlangıç `value` HTML'i editörde doğru gösterilir.
-* [ ] RT-003 — Component connect olmadan önce verilen `value` doğru yüklenir.
-* [ ] RT-004 — Connect olduktan sonra programatik `value` değişikliği editöre yansır.
-* [ ] RT-005 — Kullanıcı edit yaptığında component `value` güncellenir.
-* [ ] RT-006 — Programatik `value` ataması kullanıcı input'u gibi değerlendirilmez.
-* [ ] RT-007 — Aynı `value` tekrar atanırsa gereksiz transaction/event oluşmaz.
-* [ ] RT-008 — Boş editor component seviyesinde canonical boş değere normalize edilir.
-* [ ] RT-009 — `<p></p>` boş içerik olarak kabul edilir.
-* [ ] RT-010 — Yalnız whitespace içeren içerik için boşluk semantiği doğru çalışır.
-* [ ] RT-011 — Component DOM'dan kaldırıldığında Tiptap instance destroy edilir.
-* [ ] RT-012 — Remove/reconnect sonrası editor tekrar düzgün çalışır.
-* [ ] RT-013 — Sayfada birden fazla editor birbirinden bağımsız çalışır.
-* [ ] RT-014 — Bir editorün toolbar, selection veya state'i diğer editorü etkilemez.
+* [x] RT-001 — Component boş oluşturulduğunda editor açılır.
+* [x] RT-002 — Başlangıç `value` HTML'i editörde doğru gösterilir.
+* [x] RT-003 — Component connect olmadan önce verilen `value` doğru yüklenir.
+* [x] RT-004 — Connect olduktan sonra programatik `value` değişikliği editöre yansır.
+* [x] RT-005 — Kullanıcı edit yaptığında component `value` güncellenir.
+* [x] RT-006 — Programatik `value` ataması kullanıcı input'u gibi değerlendirilmez.
+* [x] RT-007 — Aynı `value` tekrar atanırsa gereksiz transaction/event oluşmaz.
+* [x] RT-008 — Boş editor component seviyesinde canonical boş değere normalize edilir.
+* [x] RT-009 — `<p></p>` boş içerik olarak kabul edilir.
+* [x] RT-010 — Yalnız whitespace içeren içerik için boşluk semantiği doğru çalışır.
+* [x] RT-011 — Component DOM'dan kaldırıldığında Tiptap instance destroy edilir.
+* [x] RT-012 — Remove/reconnect sonrası editor tekrar düzgün çalışır.
+* [x] RT-013 — Sayfada birden fazla editor birbirinden bağımsız çalışır.
+* [x] RT-014 — Bir editorün toolbar, selection veya state'i diğer editorü etkilemez.
 
 ---
 
 ## 2. Form Integration
 
-* [ ] FORM-001 — `name` varsa form submit sırasında editor değeri gönderilir.
-* [ ] FORM-002 — `name` yoksa form verisine dahil edilmez.
-* [ ] FORM-003 — Başlangıç değeri submit edilir.
-* [ ] FORM-004 — Kullanıcı tarafından değiştirilmiş değer submit edilir.
-* [ ] FORM-005 — `form.reset()` başlangıç değerini geri yükler.
-* [ ] FORM-006 — Reset sonrası editor DOM'u da başlangıç değerine döner.
-* [ ] FORM-007 — `disabled` durumda edit yapılamaz.
-* [ ] FORM-008 — `disabled` durumda değer form submit'e dahil edilmez.
-* [ ] FORM-009 — `readonly` durumda içerik değiştirilemez.
-* [ ] FORM-010 — `readonly` durumda değer form submit'e dahil edilir.
-* [ ] FORM-011 — `required` + boş editor invalid olur.
-* [ ] FORM-012 — `required` + `<p></p>` invalid olur.
-* [ ] FORM-013 — Gerçek içerik girildiğinde validity düzelir.
-* [ ] FORM-014 — Programatik `value` değişimi validity durumunu günceller.
-* [ ] FORM-015 — `maxlength` tanımlıysa limit uygulanır.
-* [ ] FORM-016 — `maxlength` kaldırıldığında limit kaldırılır.
+* [x] FORM-001 — `name` varsa form submit sırasında editor değeri gönderilir.
+* [x] FORM-002 — `name` yoksa form verisine dahil edilmez.
+* [x] FORM-003 — Başlangıç değeri submit edilir.
+* [x] FORM-004 — Kullanıcı tarafından değiştirilmiş değer submit edilir.
+* [x] FORM-005 — `form.reset()` başlangıç değerini geri yükler.
+* [x] FORM-006 — Reset sonrası editor DOM'u da başlangıç değerine döner.
+* [x] FORM-007 — `disabled` durumda edit yapılamaz.
+* [x] FORM-008 — `disabled` durumda değer form submit'e dahil edilmez.
+* [x] FORM-009 — `readonly` durumda içerik değiştirilemez.
+* [x] FORM-010 — `readonly` durumda değer form submit'e dahil edilir.
+* [x] FORM-011 — `required` + boş editor invalid olur.
+* [x] FORM-012 — `required` + `<p></p>` invalid olur.
+* [x] FORM-013 — Gerçek içerik girildiğinde validity düzelir.
+* [x] FORM-014 — Programatik `value` değişimi validity durumunu günceller.
+* [x] FORM-015 — `maxlength` tanımlıysa limit uygulanır.
+* [x] FORM-016 — `maxlength` kaldırıldığında limit kaldırılır.
 
 ---
 
@@ -379,45 +931,45 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ## 13. Links
 
-* [ ] LINK-001 — Selected text'e link eklenir.
-* [ ] LINK-002 — Mevcut link URL'i değiştirilebilir.
-* [ ] LINK-003 — Link kaldırılabilir.
-* [ ] LINK-004 — Link text'i değiştirilebilir.
-* [ ] LINK-005 — URL yazıldığında autolink davranışı doğru çalışır.
-* [ ] LINK-006 — URL paste edildiğinde autolink davranışı doğru çalışır.
-* [ ] LINK-007 — Selected text üzerine URL paste davranışı belirlenen sözleşmeye uyar.
-* [ ] LINK-008 — `https://` URL kabul edilir.
-* [ ] LINK-009 — `http://` URL politikaya göre kabul/reddedilir.
-* [ ] LINK-010 — Relative URL politikaya göre kabul/reddedilir.
-* [ ] LINK-011 — `mailto:` politikaya göre kabul/reddedilir.
-* [ ] LINK-012 — `tel:` politikaya göre kabul/reddedilir.
-* [ ] LINK-013 — Boş href link oluşturmaz.
-* [ ] LINK-014 — Baştaki/sondaki whitespace normalize edilir.
-* [ ] LINK-015 — `javascript:` URL reddedilir.
-* [ ] LINK-016 — Mixed-case tehlikeli scheme reddedilir.
-* [ ] LINK-017 — Control character içeren tehlikeli URL bypass edemez.
-* [ ] LINK-018 — Output link'te beklenen `rel` attribute'u bulunur.
-* [ ] LINK-019 — `_blank` target politikası doğru uygulanır.
-* [ ] LINK-020 — Edit modunda link click yanlışlıkla navigation başlatmaz.
-* [ ] LINK-021 — Link copy/paste sonrası korunur.
-* [ ] LINK-022 — Link undo/redo çalışır.
+* [x] LINK-001 — Selected text'e link eklenir.
+* [x] LINK-002 — Mevcut link URL'i değiştirilebilir.
+* [x] LINK-003 — Link kaldırılabilir.
+* [x] LINK-004 — Link text'i değiştirilebilir.
+* [x] LINK-005 — URL yazıldığında autolink davranışı doğru çalışır.
+* [x] LINK-006 — URL paste edildiğinde autolink davranışı doğru çalışır.
+* [x] LINK-007 — Selected text üzerine URL paste davranışı belirlenen sözleşmeye uyar.
+* [x] LINK-008 — `https://` URL kabul edilir.
+* [x] LINK-009 — `http://` URL politikaya göre kabul/reddedilir.
+* [x] LINK-010 — Relative URL politikaya göre kabul/reddedilir.
+* [x] LINK-011 — `mailto:` politikaya göre kabul/reddedilir.
+* [x] LINK-012 — `tel:` politikaya göre kabul/reddedilir.
+* [x] LINK-013 — Boş href link oluşturmaz.
+* [x] LINK-014 — Baştaki/sondaki whitespace normalize edilir.
+* [x] LINK-015 — `javascript:` URL reddedilir.
+* [x] LINK-016 — Mixed-case tehlikeli scheme reddedilir.
+* [x] LINK-017 — Control character içeren tehlikeli URL bypass edemez.
+* [x] LINK-018 — Output link'te beklenen `rel` attribute'u bulunur.
+* [x] LINK-019 — `_blank` target politikası doğru uygulanır.
+* [x] LINK-020 — Edit modunda link click yanlışlıkla navigation başlatmaz.
+* [x] LINK-021 — Link copy/paste sonrası korunur.
+* [x] LINK-022 — Link undo/redo çalışır.
 
 ---
 
 ## 14. Images
 
-* [ ] IMG-001 — URL ile image eklenebilir.
-* [ ] IMG-002 — `src` serialize edilir.
-* [ ] IMG-003 — `alt` serialize edilir.
-* [ ] IMG-004 — `title` serialize edilir.
+* [x] IMG-001 — URL ile image eklenebilir.
+* [x] IMG-002 — `src` serialize edilir.
+* [x] IMG-003 — `alt` serialize edilir.
+* [x] IMG-004 — `title` serialize edilir.
 * [ ] IMG-005 — Image seçilebilir.
 * [ ] IMG-006 — Image silinebilir.
 * [ ] IMG-007 — Image insertion undo/redo çalışır.
 * [ ] IMG-008 — Broken image URL editorü bozmaz.
 * [ ] IMG-009 — Boş URL image oluşturmaz.
 * [ ] IMG-010 — Unsupported URL scheme politikaya göre engellenir.
-* [ ] IMG-011 — Base64 image varsayılan politikaya göre reddedilir.
-* [ ] IMG-012 — Image HTML round-trip'te korunur.
+* [x] IMG-011 — Base64 image varsayılan politikaya göre reddedilir.
+* [x] IMG-012 — Image HTML round-trip'te korunur.
 * [ ] IMG-013 — Image öncesinde cursor konumlandırılabilir.
 * [ ] IMG-014 — Image sonrasında cursor konumlandırılabilir.
 
@@ -439,7 +991,20 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 15. Tables
+## 15. Markdown Dönüşümleri
+
+* [x] MD-001 — Kapanış parantezi yazıldığında Markdown image syntax'ı dönüştürülür.
+* [x] MD-002 — Relative URL ve boşluklu title içeren Markdown image syntax'ı dönüştürülür.
+* [x] MD-003 — Kapanış parantezi yazıldığında Markdown link syntax'ı dönüştürülür.
+* [x] MD-004 — Güvensiz protokollü Markdown link dönüştürülmez.
+* [x] MD-005 — Güvensiz protokollü Markdown image dönüştürülmez.
+* [x] MD-006 — Plain-text paste edilen Markdown link syntax'ı dönüştürülür.
+* [x] MD-007 — Plain-text paste edilen relative URL ve title içeren Markdown image syntax'ı dönüştürülür.
+* [x] MD-008 — Plain-text paste edilen Base64 image dönüştürülmez.
+
+---
+
+## 16. Tables
 
 * [ ] TABLE-001 — RxC table oluşturulur.
 * [ ] TABLE-002 — Header row oluşturulur.
@@ -470,7 +1035,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 16. Plain Text Clipboard
+## 17. Plain Text Clipboard
 
 * [ ] CLIP-001 — Plain text paste çalışır.
 * [ ] CLIP-002 — Multiline plain text paste çalışır.
@@ -484,7 +1049,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 17. Rich HTML Clipboard
+## 18. Rich HTML Clipboard
 
 * [ ] CLIP-010 — Bold text copy/paste korunur.
 * [ ] CLIP-011 — Birden fazla mark içeren text copy/paste korunur.
@@ -500,7 +1065,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 18. External Clipboard Sources
+## 19. External Clipboard Sources
 
 * [ ] CLIP-EXT-001 — Normal web sayfasından rich text paste edilir.
 * [ ] CLIP-EXT-002 — Microsoft Word'den paste document'i bozmaz.
@@ -515,7 +1080,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 19. Paste Normalization
+## 20. Paste Normalization
 
 * [ ] PASTE-001 — Kaynak font-family temizlenir.
 * [ ] PASTE-002 — Kaynak font-size temizlenir.
@@ -533,7 +1098,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 20. Security / Hostile HTML
+## 21. Security / Hostile HTML
 
 * [ ] SEC-001 — `<script>` paste edilince executable script oluşmaz.
 * [ ] SEC-002 — `<img onerror="...">` event handler korunmaz.
@@ -560,7 +1125,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 21. Serialization / Persistence
+## 22. Serialization / Persistence
 
 * [ ] SER-001 — Paragraph round-trip korunur.
 * [ ] SER-002 — Heading round-trip korunur.
@@ -585,7 +1150,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 22. Events
+## 23. Events
 
 * [ ] EVT-001 — Kullanıcı typing yaptığında `input` event'i gelir.
 * [ ] EVT-002 — Formatting değişikliği `input` olarak değerlendirilir.
@@ -605,7 +1170,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 23. Toolbar
+## 24. Toolbar
 
 * [ ] TOOL-001 — Toolbar button'ları doğru command'i çağırır.
 * [ ] TOOL-002 — Unsupported command button'u disabled olur.
@@ -623,7 +1188,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 24. Keyboard Shortcuts
+## 25. Keyboard Shortcuts
 
 * [ ] KEY-001 — Ctrl/Cmd+B bold çalışır.
 * [ ] KEY-002 — Ctrl/Cmd+I italic çalışır.
@@ -639,7 +1204,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 25. Accessibility
+## 26. Accessibility
 
 * [ ] A11Y-001 — Component label ile ilişkilendirilebilir.
 * [ ] A11Y-002 — Editor keyboard-only kullanılabilir.
@@ -658,7 +1223,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 26. Light DOM / CSS Integration
+## 27. Light DOM / CSS Integration
 
 * [ ] DOM-001 — Editor içeriği uygulamanın global typography CSS'inden etkilenir.
 * [ ] DOM-002 — Paragraph stilleri editor içinde uygulanır.
@@ -675,7 +1240,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 27. Lifecycle / Memory
+## 28. Lifecycle / Memory
 
 * [ ] LIFE-001 — Component connect olduğunda tek editor instance oluşturulur.
 * [ ] LIFE-002 — Property/attribute update yeni gereksiz editor instance oluşturmaz.
@@ -688,7 +1253,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 28. Stress / Resilience
+## 29. Stress / Resilience
 
 * [ ] STRESS-001 — 50 KB HTML sorunsuz yüklenir.
 * [ ] STRESS-002 — 500 KB paste kontrollü şekilde işlenir.
@@ -703,7 +1268,7 @@ Aşağıdaki case'ler Bold, Italic, Underline, Strike ve Inline Code için param
 
 ---
 
-## 29. Cross-Browser
+## 30. Cross-Browser
 
 * [ ] BROWSER-001 — Chromium üzerinde temel editing çalışır.
 * [ ] BROWSER-002 — Firefox üzerinde temel editing çalışır.

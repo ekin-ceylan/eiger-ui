@@ -9,6 +9,7 @@ export default class RichTextEditorLink {
                     attrs: {
                         href: this.url,
                         target: this.blank ? '_blank' : null,
+                        rel: 'noopener noreferrer nofollow',
                     },
                 },
             ],

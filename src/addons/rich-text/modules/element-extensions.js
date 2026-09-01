@@ -24,8 +24,7 @@ export default function createElementExtensions() {
         group: 'block', // Bu bir blok elemandır
         content: 'block+', // İçine en az bir tane blok (p, div, h1 vs) almak zorundadır
         addAttributes: () => ({
-            ...getAttributesObject('href', 'target'),
-            rel: { default: 'noopener noreferrer nofollow' },
+            ...getAttributesObject('href', 'target', 'rel'),
         }),
         parseHTML() {
             return [

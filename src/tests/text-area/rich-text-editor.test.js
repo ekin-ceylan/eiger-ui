@@ -570,6 +570,17 @@ describe('Rich text editor - Links', () => {
         await fixture.host.updateComplete;
         expect(fixture.host.value).toContain('href="https://example.com"');
     });
+
+    it('LINK-023 preserves link attributes entered through the source editor', async () => {
+        const fixture = await initTestFixture('<rich-text-editor label="Description"></rich-text-editor>');
+        const sourceHtml = '<p><a href="https://example.com/inline">Inline</a></p><a href="https://example.com/block"><p>Block</p></a>';
+
+        fixture.input.value = sourceHtml;
+        fixture.input.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }));
+        await fixture.host.updateComplete;
+
+        expect(fixture.host.value).toBe(sourceHtml);
+    });
 });
 
 describe('Rich text editor - Images', () => {
@@ -658,7 +669,7 @@ describe('Rich text editor - Markdown Conversions', () => {
             id: 'MD-003',
             description: 'converts link syntax',
             markdown: '[Example](https://example.com',
-            expected: '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">Example</a></p>',
+            expected: '<p><a href="https://example.com">Example</a></p>',
         },
         {
             id: 'MD-004',
@@ -689,7 +700,7 @@ describe('Rich text editor - Markdown Conversions', () => {
             id: 'MD-006',
             description: 'converts link syntax',
             markdown: '[Example](https://example.com)',
-            expected: '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com">Example</a></p>',
+            expected: '<p><a href="https://example.com">Example</a></p>',
         },
         {
             id: 'MD-007',

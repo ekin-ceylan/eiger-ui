@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import { SlotCollectorMixin, StandardControlBase, defineComponent, ifDefined, isEmpty, mixins, spread } from 'custom-ui';
+import { SlotCollectorMixin, StandardControlBase, defineComponent, ifDefined, isEmpty, lockAllScrolls, mixins, spread, unlockAllScrolls } from 'custom-ui';
 import { formatEditorContent, trimTrailingP } from './modules/rich-text-helper.js';
 import RichTextImage from './models/RichTextImage.js';
 import RichTextEditorLink from './models/RichTextEditorLink.js';
@@ -59,12 +59,6 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         }
 
         return this.#cachedInput;
-    }
-
-    constructor() {
-        super();
-        this.value = '';
-        this.placeholder = ''; // Varsayılan yer tutucu metin
     }
 
     connectedCallback() {
@@ -165,7 +159,13 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         this.#editorContainer = this.renderRoot.querySelector('[data-role="editor"]');
         if (!this.#editorContainer || this.#editor) return;
 
-        const starterKitExtension = StarterKit.configure({ link: { openOnClick: false, markdownLinks: true } });
+        const starterKitExtension = StarterKit.configure({
+            link: {
+                openOnClick: false,
+                markdownLinks: true,
+                HTMLAttributes: { target: null, rel: null },
+            },
+        });
         const attrExtension = createAttributeExtension();
         const elementExtensions = createElementExtensions();
 
@@ -173,8 +173,10 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
             element: this.#editorContainer,
             extensions: [starterKitExtension, attrExtension, ...elementExtensions],
             content: this.value,
+            injectCSS: false,
             onUpdate: ({ editor }) => this.#onEditorUpdate(editor),
             onTransaction: () => this.requestUpdate(), // Her işlemde component'i güncelle
+            onFocus: () => (this.inputElement.value = formatEditorContent(this.value)),
         });
 
         this.#onEditorUpdate(this.#editor);
@@ -228,14 +230,18 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         }
     }
 
-    #onBlur(event) {
-        event.target.value = formatEditorContent(this.value);
+    #onBlur(_event) {
         this.#checkValidity(true);
+    }
+
+    #onFocus() {
+        if (!this.#showSourceCode) this.#editor.commands.focus();
     }
 
     #onBtnCodeClick(_event) {
         this.#showSourceCode = !this.#showSourceCode;
         this.requestUpdate();
+        this.#focusEditor();
     }
 
     #onLinkSubmit(event) {
@@ -252,7 +258,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
         if (linkModel.isBlock) {
             const target = linkModel.blank ? '_blank' : null;
-            chain.updateAttributes('blockLink', { href: linkModel.url, target }).run();
+            chain.updateAttributes('blockLink', { href: linkModel.url, target, rel: 'noopener noreferrer nofollow' }).run();
         } else {
             // düzenleme moduysa tüm linki seç
             if (this.#editor.isActive('link')) {
@@ -274,6 +280,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
             this.#linkForm.value = new RichTextEditorLink();
             this.#linkForm.reset(); // Formu sıfırla
             this.#editor.commands.focus(); // Popover kapanınca odak editöre dönsün
+            unlockAllScrolls(this.#linkForm);
         }
     }
 
@@ -301,6 +308,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
             this.#imageForm.value = new RichTextImage();
             this.#imageForm.reset(); // Formu sıfırla
             this.#editor.commands.focus();
+            unlockAllScrolls(this.#imageForm);
         }
     }
 
@@ -350,28 +358,49 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
     /** @param {number} from */
     #openLinkFormPopover(from) {
         this.#linkForm.showPopover();
-
-        const coords = this.#editor.view.coordsAtPos(from); // İmlecin ekrandaki koordinatlarını al
-
-        this.#linkForm.style.margin = '0'; // Popover'ı ekranın ortasına sabitleyen varsayılan margin'i sıfırla
-        this.#linkForm.style.top = `${coords.bottom + 10}px`; // Metnin hemen altına (10px boşlukla) yerleştir
-
-        const popoverRect = this.#linkForm.getBoundingClientRect(); // Popover'ın ekranın sağından taşmasını engellemek için basit bir kontrol
-        const overflowRight = coords.left + popoverRect.width > window.innerWidth;
-        this.#linkForm.style.left = overflowRight ? `${window.innerWidth - popoverRect.width - 20}px` : `${coords.left}px`;
+        lockAllScrolls(this.#linkForm, () => this.#linkForm?.hidePopover());
+        this.#positionPopover(this.#linkForm, from);
     }
 
     /** @param {number} from */
     #openImageFormPopover(from) {
         this.#imageForm.showPopover();
+        lockAllScrolls(this.#imageForm, () => this.#imageForm?.hidePopover());
 
+        this.#positionPopover(this.#imageForm, from);
+    }
+
+    /**
+     * @param {HTMLElement} popover
+     * @param {number} from
+     */
+    #positionPopover(popover, from) {
+        const gap = 10;
+        const viewportPadding = 20;
         const coords = this.#editor.view.coordsAtPos(from);
-        this.#imageForm.style.margin = '0';
-        this.#imageForm.style.top = `${coords.bottom + 10}px`;
 
-        const popoverRect = this.#imageForm.getBoundingClientRect();
-        const overflowRight = coords.left + popoverRect.width > window.innerWidth;
-        this.#imageForm.style.left = overflowRight ? `${window.innerWidth - popoverRect.width - 20}px` : `${coords.left}px`;
+        popover.style.margin = '0';
+        popover.style.right = 'auto';
+        popover.style.bottom = 'auto';
+        popover.style.maxHeight = `${window.innerHeight - viewportPadding * 2}px`;
+        popover.style.overflowY = 'auto';
+
+        const popoverRect = popover.getBoundingClientRect();
+        const spaceAbove = coords.top - viewportPadding - gap;
+        const spaceBelow = window.innerHeight - coords.bottom - viewportPadding - gap;
+        const openAbove = spaceAbove > spaceBelow;
+        const preferredTop = openAbove ? coords.top - gap - popoverRect.height : coords.bottom + gap;
+        const maxTop = window.innerHeight - popoverRect.height - viewportPadding;
+        const maxLeft = window.innerWidth - popoverRect.width - viewportPadding;
+
+        popover.style.top = `${Math.max(viewportPadding, Math.min(preferredTop, maxTop))}px`;
+        popover.style.left = `${Math.max(viewportPadding, Math.min(coords.left, maxLeft))}px`;
+        popover.dataset.placement = openAbove ? 'top' : 'bottom';
+    }
+
+    #focusEditor() {
+        if (this.#showSourceCode) this.inputElement.focus();
+        else this.#editor.commands.focus();
     }
 
     #handleBlockTypeChange(e) {
@@ -392,7 +421,7 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
     /** @returns {import('lit').TemplateResult | typeof nothing} */
     renderPlaceholder() {
-        if (!isEmpty(this.value)) return nothing;
+        if (!isEmpty(this.value) || !this.placeholder) return nothing;
 
         return html`<span data-role="placeholder" aria-hidden="true">${this.placeholder}</span>`;
     }
@@ -405,15 +434,15 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
 
     renderBlockSelection() {
         return html`<select @change=${this.#handleBlockTypeChange} .value=${this.activeBlock} aria-label="Text Style">
-            <option value="p">Paragraph</option>
-            <option value="h1">Heading 1</option>
-            <option value="h2">Heading 2</option>
-            <option value="h3">Heading 3</option>
-            <option value="h4">Heading 4</option>
-            <option value="h5">Heading 5</option>
-            <option value="h6">Heading 6</option>
-            <option value="blockquote">Blockquote</option>
-            <option value="codeBlock">Code Block</option>
+            <option value="p" title="Paragraph">¶</option>
+            <option value="h1" title="Heading 1">H1</option>
+            <option value="h2" title="Heading 2">H2</option>
+            <option value="h3" title="Heading 3">H3</option>
+            <option value="h4" title="Heading 4">H4</option>
+            <option value="h5" title="Heading 5">H5</option>
+            <option value="h6" title="Heading 6">H6</option>
+            <option value="blockquote" title="Blockquote">❜❜</option>
+            <option value="codeBlock" title="Code Block">${'</>'}</option>
         </select>`;
     }
 
@@ -432,28 +461,33 @@ export default class RichTextEditor extends mixins(StandardControlBase, SlotColl
         const btnBulletList = this.renderButton(this.#toggleBulletList, '•', 'Bullet List', 'bulletList');
         const btnOrderedList = this.renderButton(this.#toggleOrderedList, '1.', 'Ordered List', 'orderedList');
 
+        const commandButtons = html`${this.renderBlockSelection()} ${btnBold} ${btnItalic} ${btnStrike} ${btnBulletList} ${btnOrderedList} ${btnLink} ${btnImage}`;
+
         return html`${this.renderLabel()}
-            <div role="toolbar">
-                <button type="button" @click=${this.#onBtnCodeClick} aria-pressed=${this.#showSourceCode}>${'</>'}</button>
-                ${btnUndo} ${btnRedo} ${this.renderBlockSelection()} ${btnBold} ${btnItalic} ${btnStrike} ${btnBulletList} ${btnOrderedList} ${btnLink} ${btnImage}
-            </div>
-            <div data-role="container">
-                <div data-role="editor"></div>
+            <div data-role="container" data-source-view=${this.#showSourceCode ? 'true' : 'false'}>
+                <div role="toolbar">
+                    <button type="button" @click=${this.#focusEditor} data-role="skip-to-editor">Editöre Atla</button>
+                    ${this.#showSourceCode ? nothing : commandButtons} ${btnUndo} ${btnRedo}
+                    <button type="button" @click=${this.#onBtnCodeClick} title="Kaynak Kodu Göster" aria-pressed=${this.#showSourceCode}>${'<>'}</button>
+                </div>
                 <textarea
                     ${spread(this.getScopedAttrs('input'))}
                     id=${this.fieldId}
                     name=${ifDefined(this.name)}
-                    ?hidden=${!this.#showSourceCode}
                     aria-labelledby=${ifDefined(this.labelId)}
                     aria-label=${ifDefined(this.hideLabel ? this.label : undefined)}
                     aria-errormessage=${ifDefined(this.errorId)}
                     aria-required=${this.required ? 'true' : 'false'}
                     aria-invalid=${ifDefined(this.ariaInvalid)}
                     ?required=${this.required}
+                    spellcheck="false"
                     @input=${this.#onInput}
                     @blur=${this.#onBlur}
+                    @focus=${this.#onFocus}
                     data-role="source"
+                    tabindex=${this.#showSourceCode ? nothing : '-1'}
                 ></textarea>
+                <div data-role="editor" @click=${this.#focusEditor}></div>
                 ${this.renderPlaceholder()} ${this.renderClearButton()}
             </div>
             <rt-link-form @submit=${this.#onLinkSubmit} @remove=${this.#onLinkRemove} @toggle=${this.#onLinkToggle} @cancel=${this.#onLinkCancel} popover="auto"></rt-link-form>

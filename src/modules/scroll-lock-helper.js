@@ -1,8 +1,13 @@
-const allowedElements = new Set();
+/** @type {Map<HTMLElement, ((detail: { reason: 'scroll' | 'resize', event: Event, element: HTMLElement }) => void) | undefined>} */
+const scrollLocks = new Map();
+
+function findAllowedElement(path) {
+    return [...scrollLocks.keys()].find(element => path.includes(element));
+}
 
 function preventDefault(e) {
     const path = e.composedPath();
-    const targetElement = [...allowedElements].find(el => path.includes(el));
+    const targetElement = findAllowedElement(path);
 
     if (!targetElement) {
         e.preventDefault();
@@ -23,18 +28,39 @@ function preventDefault(e) {
     }
 }
 
+function onGlobalScroll(e) {
+    const path = e.composedPath();
+
+    for (const [element, callback] of scrollLocks) {
+        if (!path.includes(element)) {
+            callback?.({ reason: 'scroll', event: e, element });
+        }
+    }
+}
+
+function onResize(e) {
+    for (const [element, callback] of scrollLocks) {
+        callback?.({ reason: 'resize', event: e, element });
+    }
+}
+
 /**
  * Prevents all wheel and touchmove events in the page for the given element
- * @param {HTMLElement} element
+ * @param {HTMLElement} element The element for which to lock all scrolls
+ * @param {(detail: { reason: 'scroll' | 'resize', event: Event, element: HTMLElement }) => void} [onScrollCallback]
+ * Callback invoked when an external scroll or resize can invalidate anchored positioning
  * @returns void
  */
-export function lockAllScrolls(element) {
+export function lockAllScrolls(element, onScrollCallback) {
     if (!element) return;
-    allowedElements.add(element);
+    const isFirstLock = scrollLocks.size === 0;
+    scrollLocks.set(element, onScrollCallback);
 
-    if (allowedElements.size === 1) {
+    if (isFirstLock) {
         globalThis.addEventListener('wheel', preventDefault, { passive: false });
         globalThis.addEventListener('touchmove', preventDefault, { passive: false });
+        globalThis.addEventListener('scroll', onGlobalScroll, { capture: true, passive: true });
+        globalThis.addEventListener('resize', onResize, { passive: true });
     }
 }
 
@@ -45,11 +71,13 @@ export function lockAllScrolls(element) {
  */
 export function unlockAllScrolls(element) {
     if (!element) return;
-    allowedElements.delete(element);
+    scrollLocks.delete(element);
 
-    if (allowedElements.size === 0) {
+    if (scrollLocks.size === 0) {
         globalThis.removeEventListener('wheel', preventDefault);
         globalThis.removeEventListener('touchmove', preventDefault);
+        globalThis.removeEventListener('scroll', onGlobalScroll, { capture: true });
+        globalThis.removeEventListener('resize', onResize);
     }
 }
 

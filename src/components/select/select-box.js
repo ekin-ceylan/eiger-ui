@@ -8,6 +8,11 @@ import CustomOptgroup from './custom-optgroup.js';
 import OptionsControlBase from '../../base/options-control-base.js';
 import Keys from '../../enums/Keys.js';
 
+/**
+ * A custom select box component that extends the OptionsControlBase.
+ * Provides enhanced functionality for handling options, groups, and selection state.
+ * @extends {OptionsControlBase}
+ */
 export default class SelectBox extends OptionsControlBase {
     // #region STATICS, FIELDS, GETTERS
 

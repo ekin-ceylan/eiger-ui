@@ -123,7 +123,7 @@ export default class FormControlBase extends lightMixins(PropValidatorMixin, Uni
         super();
 
         /** The name attribute of the form control. @type {string} */
-        this.name = '';
+        this.name = undefined;
         /** The label associated with the form control. @type {string} */
         this.label = '';
         /** The current value of the form control. @type {string} */
